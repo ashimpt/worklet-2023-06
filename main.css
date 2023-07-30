@@ -1,0 +1,32 @@
+* {
+  background: #000;
+  color: tan;
+  font-family: monospace;
+  margin: 1px 0 0 0;
+  padding: 0;
+}
+
+:hover {
+  color: white;
+}
+
+canvas {
+  background: #333;
+  width: 100vw;
+  display: block
+}
+
+#info {
+  background: #333;
+  width: 100vw;
+  white-space: pre-wrap;
+}
+
+#output {
+  width: 100vw;
+  white-space: nowrap;
+}
+
+button {
+  padding: 0.5em
+}

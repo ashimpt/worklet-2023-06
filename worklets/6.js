@@ -1,0 +1,96 @@
+// prettier-ignore
+const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, random, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
+import { Math2 } from "../math2.js";
+const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
+const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
+import { sr, setup, process } from "../mod.js";
+////////////////////////////////////////////////////////////////////////////////
+
+let tet = 9;
+let keys = [0, 3, 4, 5, 8];
+const freq = (n) => 100 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
+setup({ set12: () => ((tet = 12), (keys = [0, 4, 5, 7, 11])) });
+
+
+const bass = [3, -1];
+
+class Synth {
+  constructor(id) {
+    this.pp = id / 5;
+    this.o = [2, 1, 0, 0, 1, 2].at(id);
+    this.v = [4, 2, 1, 1, 2, 4].at(id);
+    this.pat = rnd(2 ** 8);
+  }
+  process(data, i0, i, t, speed) {
+    const { o, v, pp } = this;
+    if (i % (32 * sr) == 0) this.pat = rnd(2 ** 8);
+    const n = v * (t + 0.7 * speed);
+    const pattern = 0b11 & (this.pat >> (2 * floor(n % 4)));
+    const n0 = 5 * o + bass.at((n / 16) % 2) + pattern;
+    const e0 = min((n % 1) / 1e-3, (1 - (n % 1)) ** 2);
+    const e1 = (1 - (n % 1)) ** 5;
+    const e2 = (1 - (n % 1)) ** 7;
+    const p = TAU * freq(n0) * t;
+    const a = 0.5 * min(1, 8 / (n0 + 5));
+    const b = a * e0 * sin(p + 1.1 * e1 * sin(E * p + 0.7 * e2 * sin(p / E)));
+    for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
+  }
+}
+const synths = [0, 1, 2, 3, 4, 5].map((v) => new Synth(v));
+
+const tapes = [0, 1].map(() => new Loop(8));
+const holdOpt = (v) => ({ l: round(sr / v), k: exp(-0.6 / sr) });
+const holds = [1.8, 1.7, 1.5, 1.6].map((v) => Hold.create(holdOpt(v)));
+const bandOpt = { type: "band", f: 6400, q: 0.7 };
+const bands = [0, 1, 2, 3].map(() => Filter.create(bandOpt));
+const hold0Opt = { k: exp(-18 / sr), l: sr / 6, f: () => 10 ** -rnd() };
+const hold0 = Hold.create(hold0Opt);
+
+const delays = [...Array(12)].map(() => new Loop(1));
+const srt = sr / 1000;
+
+const aux0 = [0, 0];
+process(6, function (data, spb, i0, i, t) {
+  for (; i0 < spb; i0++, t = ++i / sr) {
+    const speed = am(t / 32);
+    for (const s of synths) s.process(data, i0, i, t, speed);
+
+    for (let ch = 2; ch--; ) data[ch][i0] = 0.4 * tanh(data[ch][i0]);
+
+    aux0[0] = aux0[1] = 0;
+    for (let ch = 2; ch--; ) {
+      const x0 = i + (-1.2 + 1.0 * holds[ch](i)) * sr;
+      const b0 = tapes[ch].get(x0);
+      const b1 = tapes[ch].get(x0 - 4 * sr);
+      const fb0 = bands[ch](b0 + b1);
+      aux0[ch] += fb0;
+
+      const x1 = i + (-3.2 + 1.0 * holds[ch + 2](i)) * sr;
+      const b2 = tapes[ch].get(x1);
+      const b3 = tapes[ch].get(x1 - 4 * sr);
+      const fb1 = bands[ch + 2](b2 + b3);
+      aux0[ch & 1] += pan(0.33) * fb1;
+      aux0[ch ^ 1] += pan(0.67) * fb1;
+    }
+
+    const lfoRnd = hold0(i);
+    for (let ch = 2; ch--; ) {
+      tapes[ch].set(lfoRnd * data[ch][i0] + 0.1 * aux0[ch], i);
+    }
+
+    for (let ch = 2; ch--; ) {
+      const in0 = 1.0 * aux0[ch] + 0.1 * data[ch][i0];
+      const in1 = 0.7 * aux0[ch ^ 1];
+      let del = 31.111;
+      const b0 = delays[ch + 0].feedback(in0, i, del-- * srt, 0.85);
+      const b1 = delays[ch + 2].feedback(in1, i, del-- * srt, 0.86);
+      const b2 = delays[ch + 4].feedback(in0, i, del-- * srt, 0.87);
+      const b3 = delays[ch + 6].feedback(in0, i, del-- * srt, 0.88);
+      const b4 = delays[ch + 8].feedback(b0 - b1 + b2 - b3, i, 5 * srt, 0.7);
+      const b5 = delays[ch + 10].feedback(b4 / 4, i, 1.7 * srt, 0.7);
+      data[ch][i0] += b5;
+    }
+
+    for (let ch = 2; ch--; ) data[ch][i0] += 3 * aux0[ch];
+  }
+});

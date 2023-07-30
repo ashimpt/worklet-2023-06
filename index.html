@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="utf-8" />
+    <title>realtime dps audio</title>
+    <link rel="icon" type="image/png" href="data:image/png;base64," />
+    <link rel="stylesheet" href="main.css" />
+    <script src="misc.js"></script>
+    <script src="analyser.js"></script>
+    <script src="pcm-to-wave.js"></script>
+    <script src="main.js"></script>
+    <style></style>
+  </head>
+
+  <body>
+    <canvas width="400" height="100" id="analyser">analyser</canvas>
+    <div id="info">></div>
+    <div id="output"></div>
+    <br />
+    URLSearchParams<br />
+    <a href="./?tet12=1">in tune</a>
+    <a href="./?sr=12000">12kHz</a>
+    <a href="./?sr=48000">48kHz</a>
+    <a href="./?sr=48000&bit=16&rec=1">rec</a>
+    <a href="./?solo=1&fade=1">short</a>
+    <a href="./?solo=360&fade=90">long</a>
+  </body>
+</html>
