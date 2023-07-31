@@ -6,8 +6,6 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 import { sr, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
 
-const keys = [0, 2, 4, 6, 8];
-const freq = (n) => 100 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / 9);
 const tapes = [0, 1].map(() => new Loop(8));
 const numBirds = 10;
 const bag = [...Array(40)].map((v, i) => 10 ** -(i % 10));
@@ -23,32 +21,33 @@ class Bird {
     this.update();
   }
   update() {
-    this.f0 = mix(freq(0), freq(20), Math2.rndTriangular(0.5));
-    this.f1 = mix(freq(0), freq(20), Math2.rndTriangular(0.3));
+    this.f0 = mix(100, 1600, Math2.rndTriangular(0.5));
+    this.f1 = mix(100, 1600, Math2.rndTriangular(0.3));
     this.e0 = rnd(0.1, 0.9);
     this.d0 = rnd(0.03, 0.2, 1); // rest
     this.d1 = rnd(0.03, 0.3, 2);
+    this.count = 0;
+    this.maxCount = floor(6 / (this.d0 + this.d1));
     this.a0 = 0.8 * sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
     this.a1 = 10 ** rnd(-10 / 20);
     if (this.a0 < 1e-5) this.a0 = 0;
   }
   process(data, i0, i, t) {
-    const { f0, f1, start, d0, d1, e0, a0, a1, pp } = this;
-    if (t >= start + d1) {
-      this.start = t + d0;
-      if (rnd(8) < 1) this.update();
-      return;
+    const { f0, f1, start, d1, e0, a0, a1, pp } = this;
+    if (t < start) return;
+    if (t < start + d1) {
+      if (!a0) return;
+      const p0 = (t - start) / d1;
+      this.p += TAU * mix(f0, f1, p0) * (1 / sr);
+      const p = this.p;
+      const b = a0 * asd(p0, e0) * sin(p + sin(p));
+      const wet = a1 * b;
+      for (let ch = 2; ch--; ) aux0[ch] += pan(ch ? pp : 1 - pp) * wet;
+      for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
+    } else {
+      this.start = t + this.d0;
+      if (rnd(8) < 1 || this.count++ > this.maxCount) this.update();
     }
-
-    if (t < start || !a0) return;
-
-    const p0 = (t - start) / d1;
-    this.p += TAU * mix(f0, f1, p0) * (1 / sr);
-    const p = this.p;
-    const b = a0 * asd(p0, e0) * sin(p + sin(p));
-    const wet = a1 * b;
-    for (let ch = 2; ch--; ) aux0[ch] += pan(ch ? pp : 1 - pp) * wet;
-    for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
   }
 }
 const birds = [...Array(numBirds)].map((v, i) => new Bird(i));

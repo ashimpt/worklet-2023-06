@@ -11,7 +11,6 @@ let keys = [0, 3, 4, 5, 8];
 const freq = (n) => 100 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
 setup({ set12: () => ((tet = 12), (keys = [0, 4, 5, 7, 11])) });
 
-
 const bass = [3, -1];
 
 class Synth {
@@ -39,12 +38,12 @@ class Synth {
 const synths = [0, 1, 2, 3, 4, 5].map((v) => new Synth(v));
 
 const tapes = [0, 1].map(() => new Loop(8));
-const holdOpt = (v) => ({ l: round(sr / v), k: exp(-0.6 / sr) });
-const holds = [1.8, 1.7, 1.5, 1.6].map((v) => Hold.create(holdOpt(v)));
+const hlds0Opt = (v) => ({ l: round(sr / v), k: exp(-0.6 / sr) });
+const hlds0 = [1.8, 1.7, 1.5, 1.6].map((v) => Hold.create(hlds0Opt(v)));
 const bandOpt = { type: "band", f: 6400, q: 0.7 };
 const bands = [0, 1, 2, 3].map(() => Filter.create(bandOpt));
-const hold0Opt = { k: exp(-18 / sr), l: sr / 6, f: () => 10 ** -rnd() };
-const hold0 = Hold.create(hold0Opt);
+const hlds1Opt = { k: exp(-18 / sr), l: sr / 6, f: () => 10 ** -rnd() };
+const hlds1 = [0, 1].map(() => Hold.create(hlds1Opt));
 
 const delays = [...Array(12)].map(() => new Loop(1));
 const srt = sr / 1000;
@@ -59,13 +58,13 @@ process(6, function (data, spb, i0, i, t) {
 
     aux0[0] = aux0[1] = 0;
     for (let ch = 2; ch--; ) {
-      const x0 = i + (-1.2 + 1.0 * holds[ch](i)) * sr;
+      const x0 = i + (-1.2 + 1.0 * hlds0[ch](i)) * sr;
       const b0 = tapes[ch].get(x0);
       const b1 = tapes[ch].get(x0 - 4 * sr);
       const fb0 = bands[ch](b0 + b1);
       aux0[ch] += fb0;
 
-      const x1 = i + (-3.2 + 1.0 * holds[ch + 2](i)) * sr;
+      const x1 = i + (-3.2 + 1.0 * hlds0[ch + 2](i)) * sr;
       const b2 = tapes[ch].get(x1);
       const b3 = tapes[ch].get(x1 - 4 * sr);
       const fb1 = bands[ch + 2](b2 + b3);
@@ -73,9 +72,8 @@ process(6, function (data, spb, i0, i, t) {
       aux0[ch ^ 1] += pan(0.67) * fb1;
     }
 
-    const lfoRnd = hold0(i);
     for (let ch = 2; ch--; ) {
-      tapes[ch].set(lfoRnd * data[ch][i0] + 0.1 * aux0[ch], i);
+      tapes[ch].set(hlds1[ch](i) * data[ch][i0] + 0.1 * aux0[ch], i);
     }
 
     for (let ch = 2; ch--; ) {
@@ -91,6 +89,6 @@ process(6, function (data, spb, i0, i, t) {
       data[ch][i0] += b5;
     }
 
-    for (let ch = 2; ch--; ) data[ch][i0] += 3 * aux0[ch];
+    for (let ch = 2; ch--; ) data[ch][i0] += 2 * aux0[ch];
   }
 });
