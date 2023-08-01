@@ -7,7 +7,7 @@ import { sr, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
 
 const tapes = [0, 1].map(() => new Loop());
-const volume = 0.15;
+const amp = 0.15;
 
 function syn(data, n, i, t, n0, a1, pp) {
   const f = 100 * 2 ** ((n + n0) / 9);
@@ -17,61 +17,62 @@ function syn(data, n, i, t, n0, a1, pp) {
 }
 
 class Synth {
-  eAmp = 1e-5;
-  lop = Lop.create({ k: exp(-35 / sr) });
-  constructor(maxDiv = 4, bottomN = 0, times) {
-    this.bag = Bag.create({ bag: [...Array(maxDiv)].map((v, i) => i) });
-    this.bottomN = bottomN;
-    this.times = times;
+  env = 1e-5;
+  pp = 0.5;
+  end = 0;
+  lop0 = Lop.create({ k: exp(-35 / sr) });
+  constructor(id) {
+    const bag = [...Array([4, 2, 1].at(id))].map((v, i) => i);
+    this.bag = Bag.create({ bag });
+    this.dividend = [2, 4, 8].at(id);
+    this.bottom = [18, 9, 0].at(id);
+
+    this.n0 = this.bottom;
+    this.update(1);
+  }
+  update(init) {
+    this.divisor = 2 ** (1 + this.bag());
+    if (!this.rest && !init) return;
+    this.vel = [4, 8, 12].at(rnd(3));
+    const pre = this.voices;
+    while (pre == this.voices) this.voices = [2, 4, 6].at(rnd(3));
+    this.a0 = (1 / this.voices) ** 0.667;
+  }
+  trigger(i) {
+    this.start = i;
+    this.pp = rnd();
+    const pre = this.n0;
+    while (pre == this.n0) this.n0 = this.bottom + floor(rnd(27));
+    if (rnd(20) < 1 && !this.rest) {
+      this.rest = true;
+      this.end = i + sr;
+      this.dir = 0;
+    } else {
+      if (rnd(6) < 1 || this.rest) this.update();
+      this.rest = false;
+      const dr = ceil(rnd(this.dividend)) / this.divisor;
+      this.end = i + round(dr * sr);
+      this.dir = 1;
+    }
   }
   process(data, i0, i, t, spb) {
-    let { eDir, n0, start, next, pp, vel, voices, a0 } = this;
-
     for (; i0 < spb; i0++, t = ++i / sr) {
-      if (!next || i >= next) {
-        let isUpdated = 0;
-        // update
-        if (!vel || rnd(6) < 1) {
-          isUpdated = vel && 1;
-          this.divisor = 2 ** (1 + this.bag());
-          vel = [2, 4, 8, 12].at(rnd(4));
+      if (i >= this.end) this.trigger(i);
+      const { dir, n0, start, end, pp, vel, voices, a0 } = this;
 
-          if (volume * this.eAmp <= 1e-2) {
-            const p = voices;
-            while (p == voices) voices = [2, 4, 8].at(rnd(3));
-            a0 = (1 / voices) ** 0.667;
-          }
-        }
+      if (this.env == 1) this.dir = 0;
+      const tmp = this.env * exp((this.dir ? vel : -vel) / sr);
+      this.env = clip(tmp, 1e-5, 1);
 
-        // trigger
-        const blank = isUpdated && rnd(3) < 2 ? 1 / ceil(rnd(5)) : 0;
-        const dr = blank || ceil(rnd(this.times)) / this.divisor;
-        start = i;
-        next = i + round(dr * sr);
-        eDir = blank ? 0 : 1;
-        n0 = this.bottomN + floor(rnd(27));
-        pp = rnd();
-        Object.assign(this, { start, next, eDir, n0, pp, vel, voices, a0 });
-      }
-
-      // each sample
-      if (this.eAmp == 1) this.eDir = 0;
-      const tmp = this.eAmp * exp((this.eDir ? vel : -vel) / sr);
-      this.eAmp = clip(tmp, 1e-5, 1);
-
-      const e0 = asd((i - start) / (next - start), 0.01, 0.01);
-      const a1 = volume * a0 * this.eAmp * e0;
+      const e0 = asd((i - start) / (end - start), 0.01, 0.01);
+      const a1 = amp * a0 * this.env * e0;
       if (a1 <= 1e-5) continue;
-      for (let n = voices; n--; ) syn(data, n, i0, t, n0, a1, this.lop(pp));
+      for (let n = voices; n--; ) syn(data, n, i0, t, n0, a1, this.lop0(pp));
     }
   }
 }
 
-const clusters = [
-  new Synth(4, 18, 2),
-  new Synth(2, +9, 4),
-  new Synth(1, +0, 8),
-];
+const synths = [new Synth(0), new Synth(1), new Synth(2)];
 
 const delays = [...Array(12)].map(() => new Loop());
 const srt = sr / 1000;
@@ -92,6 +93,6 @@ function delay(data, spb, i0, i, t) {
 }
 
 process(1, function (data, spb, i0, i, t) {
-  for (const cluster of clusters) cluster.process(data, i0, i, t, spb);
+  for (const cluster of synths) cluster.process(data, i0, i, t, spb);
   delay(data, spb, i0, i, t);
 });

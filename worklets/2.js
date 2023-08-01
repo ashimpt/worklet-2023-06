@@ -11,14 +11,16 @@ let keys = [0, 3, 4, 5, 8];
 const freq = (n) => 100 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
 setup({ set12: () => ((tet = 12), (keys = [0, 4, 5, 7, 11])) });
 
-
 let list = [];
 let count = 0;
-const melody = (t) => round(10 * am(t / 5 + am(t / 7)));
-const rndMelody = rnd(35);
+
+const rndM = rnd();
+const mel1 = (t) => round(7 * am(3 * t + 0.5 * am(5 * t)) + 3 * am(t));
+const mel0 = (t) => mel1(25e-3 * t + rndM) + 5 * (floor(t / 20) % 2);
+
 function createNote(t) {
   const pp = (count++ % 5) / 4;
-  const n = melody(t + rndMelody) + 5 * (floor(t / 20) % 2);
+  const n = mel0(t);
   const f = freq(n);
   const rNum = list.filter((o) => o.r).length;
   const rFrq = list.find((o) => o.r && o.f == f);
@@ -29,10 +31,20 @@ function createNote(t) {
   return { i: 0, n, f, o, pp, sustain, l, fm };
 }
 
-const tape = new Loop();
-const rev = [0, 1].map(() => new Loop());
 const env = (t, dr) => max(0, 1 - t / dr);
+const tape = new Loop();
 const bp0 = Filter.create({ type: "band", u: 1 });
+const rev = [0, 1].map(() => new Loop());
+
+let p0 = 0;
+let b0 = 0;
+function synth(data, i0, t) {
+  p0 += TAU * freq(mel0(t)) * (1 / sr);
+  b0 = sin(p0 + 0.7 * b0);
+  for (let ch = 2; ch--; ) data[ch][i0] += 0.015 * b0;
+}
+
+const hps0 = [0, 1].map(() => Filter.create({ type: "high", f: 20 }));
 
 process(2, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
@@ -71,6 +83,10 @@ process(2, function (data, spb, i0, i, t) {
       tape.set(data[0][i0] + data[1][i0] + 1.0 * b1, i);
       for (let ch = 2; ch--; ) data[ch][i0] += 0.2 * b0;
     }
+
+    synth(data, i0, t);
+
+    for (let ch = 2; ch--; ) data[ch][i0] = hps0[ch](data[ch][i0]);
 
     {
       const b0 = 0.53 * rev[0].iGet(i - +8.9e-3 * sr);
