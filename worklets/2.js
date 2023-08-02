@@ -86,8 +86,6 @@ process(2, function (data, spb, i0, i, t) {
 
     synth(data, i0, t);
 
-    for (let ch = 2; ch--; ) data[ch][i0] = hps0[ch](data[ch][i0]);
-
     {
       const b0 = 0.53 * rev[0].iGet(i - +8.9e-3 * sr);
       const b1 = 0.41 * rev[1].iGet(i - 40.1e-3 * sr);
@@ -99,4 +97,6 @@ process(2, function (data, spb, i0, i, t) {
       data[1][i0] = 2.1 * mix(data[1][i0], b2 + b3, 0.4);
     }
   }
+  for (let ch = 2; ch--; )
+    for (let i = 0; i < spb; i++) data[ch][i] = hps0[ch](data[ch][i]);
 });

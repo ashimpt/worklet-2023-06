@@ -12,7 +12,7 @@ const amp = 0.15;
 function syn(data, n, i, t, n0, a1, pp) {
   const f = 100 * 2 ** ((n + n0) / 9);
   const p = TAU * f * t;
-  const b = a1 * sin(p);
+  const b = amp * a1 * sin(p);
   for (let ch = 2; ch--; ) data[ch][i] += pan(ch ? pp : 1 - pp) * b;
 }
 
@@ -32,28 +32,28 @@ class Synth {
   }
   update(init) {
     this.divisor = 2 ** (1 + this.bag());
-    if (!this.rest && !init) return;
     this.vel = [4, 8, 12].at(rnd(3));
+    if (!this.rest && !init) return;
     const pre = this.voices;
     while (pre == this.voices) this.voices = [2, 4, 6].at(rnd(3));
     this.a0 = (1 / this.voices) ** 0.667;
   }
   trigger(i) {
-    this.start = i;
-    this.pp = rnd();
     const pre = this.n0;
     while (pre == this.n0) this.n0 = this.bottom + floor(rnd(27));
+    this.dir = 1;
+    this.pp = rnd();
+
+    if (rnd(6) < 1 || this.rest) this.update();
+
+    this.start = i;
+    const dr = ceil(rnd(this.dividend)) / this.divisor;
+    this.end = i + round(dr * sr);
+
     if (rnd(20) < 1 && !this.rest) {
+      this.end += sr;
       this.rest = true;
-      this.end = i + sr;
-      this.dir = 0;
-    } else {
-      if (rnd(6) < 1 || this.rest) this.update();
-      this.rest = false;
-      const dr = ceil(rnd(this.dividend)) / this.divisor;
-      this.end = i + round(dr * sr);
-      this.dir = 1;
-    }
+    } else this.rest = false;
   }
   process(data, i0, i, t, spb) {
     for (; i0 < spb; i0++, t = ++i / sr) {
@@ -65,7 +65,7 @@ class Synth {
       this.env = clip(tmp, 1e-5, 1);
 
       const e0 = asd((i - start) / (end - start), 0.01, 0.01);
-      const a1 = amp * a0 * this.env * e0;
+      const a1 = a0 * this.env * e0;
       if (a1 <= 1e-5) continue;
       for (let n = voices; n--; ) syn(data, n, i0, t, n0, a1, this.lop0(pp));
     }

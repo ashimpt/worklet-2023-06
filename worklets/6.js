@@ -40,7 +40,7 @@ const synths = [0, 1, 2, 3, 4, 5].map((v) => new Synth(v));
 const tapes = [0, 1].map(() => new Loop(8));
 const hlds0Opt = (v) => ({ l: round(sr / v), k: exp(-0.6 / sr) });
 const hlds0 = [1.8, 1.7, 1.5, 1.6].map((v) => Hold.create(hlds0Opt(v)));
-const bandOpt = { type: "band", f: 6400, q: 0.7 };
+const bandOpt = { type: "band", f: min(0.4 * sr, 6400), q: 0.7 };
 const bands = [0, 1, 2, 3].map(() => Filter.create(bandOpt));
 const hlds1Opt = { k: exp(-18 / sr), l: sr / 6, f: () => 10 ** -rnd() };
 const hlds1 = [0, 1].map(() => Hold.create(hlds1Opt));
@@ -54,7 +54,7 @@ process(6, function (data, spb, i0, i, t) {
     const speed = am(t / 32);
     for (const s of synths) s.process(data, i0, i, t, speed);
 
-    for (let ch = 2; ch--; ) data[ch][i0] = 0.4 * tanh(data[ch][i0]);
+    for (let ch = 2; ch--; ) data[ch][i0] = 0.45 * tanh(data[ch][i0]);
 
     aux0[0] = aux0[1] = 0;
     for (let ch = 2; ch--; ) {

@@ -11,7 +11,6 @@ let keys = [0, 3, 4, 5, 8];
 const freq = (n) => 100 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
 setup({ set12: () => ((tet = 12), (keys = [0, 4, 5, 7, 11])) });
 
-
 const tapes = [0, 1].map(() => new Loop());
 const curve = (x) => mix(x, 0.5 + 0.5 * cos(PI + PI * x), 0.3);
 const hips = [0, 1].map(() => Filter.create({ type: "high", f: 20 }));
@@ -19,20 +18,28 @@ const hips = [0, 1].map(() => Filter.create({ type: "high", f: 20 }));
 process(0, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const u = 60 * (curve((t % 20) / 20) + floor(t / 20));
-    const o = (floor(u / 30) % 2) / tet + (floor(u / 60) % 2);
-    const f = freq(((7 + (floor(u / 120) % 3)) * floor(u)) % 15) * 2 ** o;
-
+    const o0 = (floor(u / 30) % 2) / tet + (floor(u / 60) % 2);
+    const f = freq(((7 + (floor(u / 120) % 3)) * floor(u)) % 15) * 2 ** o0;
+    const o = log2(f / 50);
     const p = TAU * f * t;
-    const e = asd(u);
-    const a0 = min(1, 400 / f);
-    const a1 = 1.5 / log2(f / 50);
-    const b = 0.2 * a0 * e * sin(p + a1 * e * sin(E * p));
-    const m = 0.02 * sr * sin(t);
+    const q = TAU * 2 * t;
+    const b0 = asd(u, 0.33, 0.33) * mix(sin((f + 3) * q), sin((f - 3) * q));
+    const b1 = asd(u) * sin(p + (2 / o) * asd(u, 1e-9) * sin(E * p));
+    const b = min(1, 2 / o) * (0.2 * b1 + 0.05 * b0);
+    const m = 0.015 * sr * sin(t);
+    const pp = mix(0.35, 0.8, (o - 1) / 4);
+    for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
+
     for (let ch = 2; ch--; ) {
-      const fb = 0.8 * tapes[ch].get(i - sr / (ch ? 3 : 4) + (ch ? m : -m));
-      const b0 = b + fb;
-      tapes[ch ^ 1].set(-tanh(2 * b0) / 2, i);
-      data[ch][i0] = hips[ch](b0);
+      const fb = tapes[ch ^ 1].get(i - sr / (ch ? 4 : 3) + (ch ? m : -m));
+      const b0 = (0.8 / 4) * tanh(4 * fb);
+      tapes[ch].set(data[ch][i0] + b0, i);
+      data[ch][i0] += b0;
     }
   }
+
+  for (let ch = 2; ch--; )
+    for (let i = 0; i < spb; i++) {
+      data[ch][i] = 1.5 * hips[ch](data[ch][i]);
+    }
 });
