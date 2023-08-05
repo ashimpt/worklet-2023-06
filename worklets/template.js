@@ -3,10 +3,11 @@ const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, cl
 import { Math2 } from "../math2.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
-import { sr, process } from "../mod.js";
+import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
+setup(Math2);
 
-process(Infinity, function (data, spb, i0, i, t) {
+process(7, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const p = TAU * 200 * t;
     const b = 0.3 * sin(p + sin(p));

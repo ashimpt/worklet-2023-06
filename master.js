@@ -29,7 +29,7 @@ const peakMeter = {
   sumSq: [1e-3, 1e-3],
   process(inp, spb) {
     const { peaks, sumSq } = this;
-    let blockPeak = 0;
+    let secPeak = 0;
     for (let ch = 2; ch--; ) {
       let chPeak = 0;
       for (let i = 0; i < spb; i++) {
@@ -38,32 +38,33 @@ const peakMeter = {
         sumSq[ch] += v * v;
       }
       peaks[ch] = max(peaks[ch], chPeak);
-      blockPeak = max(blockPeak, chPeak);
+      secPeak = max(secPeak, chPeak);
     }
-    this.value = max(this.value, blockPeak);
+    this.value = max(this.value, secPeak);
     this.peak = max(...peaks);
   },
   limit(inp, spb) {
     for (let ch = 2, v = this.peak; v > 1 && ch--; )
       for (let i = spb; i--; ) inp[ch][i] /= v;
   },
-  pFnc: (v) => v.toFixed(3),
-  rFnc: (v) => (20 * log10(sqrt(v))).toFixed(1),
+  db: (v) => (20 * log10(v)).toFixed(1),
   post(port, length, t) {
+    const peak = this.peaks.map((v) => v.toFixed(3));
+    const rms = this.sumSq.map((v) => this.db(sqrt(v / length)));
     const a = this.value.toFixed(3);
-    const peak = this.peaks.map(this.pFnc);
-    const rms = this.sumSq.map((v) => this.rFnc(v / length));
     const info = { peak, rms, a, t };
     port.postMessage({ info });
   },
 };
 
 class processor extends AudioWorkletProcessor {
-  length = 0;
+  params;
   seekFrame = 0;
+  length = 0;
   constructor(...args) {
     super(...args);
     this.port.onmessage = ({ data }) => {
+      this.params = data;
       this.seekFrame = round(sr * data.seekTime);
       this.length = data.totalDuration * sr;
 
@@ -95,20 +96,23 @@ class processor extends AudioWorkletProcessor {
     peakMeter.process(oup, spb);
     peakMeter.limit(oup, spb);
 
-    if (!currentFrame || floor(idx / sr) != floor((idx + spb) / sr)) {
-      // if (peakMeter.value > 0.45) {
-      //   console.log({
-      //     amp: peakMeter.value.toFixed(3),
-      //     t: floor(idx / sr),
-      //   });
-      // }
-
-      const t = floor(idx / sr) + (currentFrame ? 1 : 0);
-      peakMeter.post(this.port, idx + spb, t);
-      peakMeter.value = 0;
+    const t = floor(idx / sr);
+    if (!currentFrame || t != floor((idx + spb) / sr)) {
+      this.secProcess(spb, idx, t);
     }
 
     return true;
+  }
+  secProcess(spb, idx, ct) {
+    const t = ct + (currentFrame ? 1 : 0);
+
+    const warn = this.params.warn;
+    if (warn && peakMeter.value > warn / 100) {
+      console.log({ amp: peakMeter.value.toFixed(3), t });
+    }
+
+    peakMeter.post(this.port, idx + spb, t);
+    peakMeter.value = 0;
   }
 }
 

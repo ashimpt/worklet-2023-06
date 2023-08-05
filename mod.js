@@ -1,6 +1,7 @@
-const options = {};
 export const sr = sampleRate;
-export const setup = (opt) => Object.assign(options, opt);
+
+let math2, setupCallback;
+export const setup = (m2, fnc) => ((math2 = m2), (setupCallback = fnc));
 export function process(name, play) {
   let duration, fadeRatio, seekFrameFromStart, trackLength;
 
@@ -9,7 +10,9 @@ export function process(name, play) {
       super(...args);
       this.port.onmessage = ({ data }) => {
         const { startTime, fade, seekTime } = data;
-        if (data.tet12 && options.set12) options.set12();
+        if (setupCallback) setupCallback(data);
+        if (data.seed) math2.setSeed(data.seed);
+
         duration = data.duration;
         fadeRatio = fade / duration;
         seekFrameFromStart = parseInt(sr * (seekTime - startTime));

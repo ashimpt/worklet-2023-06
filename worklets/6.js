@@ -9,19 +9,21 @@ import { sr, setup, process } from "../mod.js";
 let tet = 9;
 let keys = [0, 3, 4, 5, 8];
 const freq = (n) => 100 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
-setup({ set12: () => ((tet = 12), (keys = [0, 4, 5, 7, 11])) });
-
-const bass = [3, -1];
+setup(Math2, (params) => {
+  if (params.tet12) tet = 12;
+  if (params.tet12) keys = [0, 4, 5, 7, 11];
+});
 
 class Synth {
+  bass = [3, -1];
   constructor(id) {
-    this.pp = id / 5;
     this.o = [2, 1, 0, 0, 1, 2].at(id);
     this.v = [4, 2, 1, 1, 2, 4].at(id);
     this.pat = rnd(2 ** 8);
+    this.pp = id / 5;
   }
   process(data, i0, i, t, speed) {
-    const { o, v, pp } = this;
+    const { bass, o, v, pp } = this;
     if (i % (32 * sr) == 0) this.pat = rnd(2 ** 8);
     const n = v * (t + 0.7 * speed);
     const pattern = 0b11 & (this.pat >> (2 * floor(n % 4)));
@@ -45,10 +47,10 @@ const bands = [0, 1, 2, 3].map(() => Filter.create(bandOpt));
 const hlds1Opt = { k: exp(-18 / sr), l: sr / 6, f: () => 10 ** -rnd() };
 const hlds1 = [0, 1].map(() => Hold.create(hlds1Opt));
 
-const delays = [...Array(12)].map(() => new Loop(1));
+const delays = [...Array(14)].map(() => new Loop(1));
 const srt = sr / 1000;
-
 const aux0 = [0, 0];
+
 process(6, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const speed = am(t / 32);
@@ -76,19 +78,32 @@ process(6, function (data, spb, i0, i, t) {
       tapes[ch].set(hlds1[ch](i) * data[ch][i0] + 0.1 * aux0[ch], i);
     }
 
-    for (let ch = 2; ch--; ) {
-      const in0 = 1.0 * aux0[ch] + 0.1 * data[ch][i0];
-      const in1 = 0.7 * aux0[ch ^ 1];
-      let del = 31.111;
-      const b0 = delays[ch + 0].feedback(in0, i, del-- * srt, 0.85);
-      const b1 = delays[ch + 2].feedback(in1, i, del-- * srt, 0.86);
-      const b2 = delays[ch + 4].feedback(in0, i, del-- * srt, 0.87);
-      const b3 = delays[ch + 6].feedback(in0, i, del-- * srt, 0.88);
-      const b4 = delays[ch + 8].feedback(b0 - b1 + b2 - b3, i, 5 * srt, 0.7);
-      const b5 = delays[ch + 10].feedback(b4 / 4, i, 1.7 * srt, 0.7);
-      data[ch][i0] += b5;
-    }
-
+    reverb(data, i0, i);
     for (let ch = 2; ch--; ) data[ch][i0] += 2 * aux0[ch];
   }
 });
+
+function reverb(data, i0, i) {
+  for (let ch = 2; ch--; ) {
+    delays[ch + 12].set(1.0 * aux0[ch] + 0.1 * data[ch][i0], i);
+  }
+
+  for (let ch = 2; ch--; ) {
+    let in0 = 0;
+    let early = 27.777 - ch / 7;
+    for (let n = 0; n < 5; n++) {
+      early += 4.444 + ch / 15;
+      const c = 12 + ((ch + n) % 2);
+      in0 += (n % 2 ? 0.3 : 0.5) * delays[c].iGet(i - early * srt);
+    }
+
+    let del = 31.111;
+    const b0 = delays[ch + 0].feedback(in0, i, del-- * srt, 0.85);
+    const b1 = delays[ch + 2].feedback(in0, i, del-- * srt, 0.86);
+    const b2 = delays[ch + 4].feedback(in0, i, del-- * srt, 0.87);
+    const b3 = delays[ch + 6].feedback(in0, i, del-- * srt, 0.88);
+    const b4 = delays[ch + 8].feedback(b0 - b1 + b2 - b3, i, 5 * srt, 0.7);
+    const b5 = delays[ch + 10].feedback(b4 / 4, i, 1.7 * srt, 0.7);
+    data[ch][i0] += b5;
+  }
+}

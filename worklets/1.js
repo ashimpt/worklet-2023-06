@@ -3,10 +3,10 @@ const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, cl
 import { Math2 } from "../math2.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
-import { sr, process } from "../mod.js";
+import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
+setup(Math2);
 
-const tapes = [0, 1].map(() => new Loop());
 const amp = 0.15;
 
 function syn(data, n, i, t, n0, a1, pp) {
@@ -73,9 +73,9 @@ class Synth {
 }
 
 const synths = [new Synth(0), new Synth(1), new Synth(2)];
-
 const delays = [...Array(12)].map(() => new Loop());
 const srt = sr / 1000;
+
 function delay(data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     for (let ch = 2; ch--; ) {

@@ -3,17 +3,19 @@ const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, cl
 import { Math2 } from "../math2.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
-import { sr, process } from "../mod.js";
+import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
+setup(Math2);
 
-const tapes = [0, 1].map(() => new Loop(4));
-const func0 = () => random() ** 0.5;
+const lopO = Lop.create({ k: exp(-7 / sr) });
+const func0 = () => rnd() ** 0.5;
 const hold0 = Hold.create({ k: exp(-9 / sr), l: sr / 8, f: func0 });
 const hold1 = Hold.create({ k: exp(-9 / sr), l: sr / 3, f: func0 });
+
+const tapes = [0, 1].map(() => new Loop(4));
 const bag = Bag.create({ bag: [-2, -1, 1, 2] });
-const hips = [0, 1].map(() => Filter.create({ type: "high", f: 20, q: 0.7 }));
-const lops = [0, 1].map(() => Filter.create({ f: 10e3 }));
-const lopO = Lop.create({ k: exp(-7 / sr) });
+const hps = [0, 1].map(() => Filter.create({ type: "high", f: 20, q: 0.7 }));
+const lps = [0, 1].map(() => Filter.create({ f: 10e3 }));
 
 let oct = 0;
 let p1 = 0;
@@ -49,8 +51,10 @@ process(5, function (data, spb, i0, i, t) {
 
       tape.x += tape.v - 1;
     }
-    for (let ch = 2; ch--; ) {
-      data[ch][i0] = lops[ch](hips[ch](data[ch][i0]));
-    }
   }
+
+  for (let ch = 2; ch--; )
+    for (let i = 0; i < spb; i++) {
+      data[ch][i] = lps[ch](hps[ch](data[ch][i]));
+    }
 });

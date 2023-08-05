@@ -3,8 +3,8 @@ const num = 7;
 addEventListener("load", () => {
   if (!params.sr) params.sr = 24e3;
   if (!params.bit) params.bit = 16;
-  if (!params.fade) params.fade = 60;
-  if (!params.solo) params.solo = 60;
+  if (!params.fade && params.fade !== 0) params.fade = 60;
+  if (!params.solo && params.solo !== 0) params.solo = 60;
   params.duration = 2 * params.fade + params.solo;
   params.interval = params.fade + params.solo;
   params.totalDuration = (num - 1) * params.interval + params.duration;
@@ -29,22 +29,23 @@ function createSeekBar() {
   const [w, h] = [width, parseInt(width / 10)];
   const co = w / params.totalDuration;
 
-  const c = pSvg.canvas(w, h);
+  const { canvas, rect, line } = pSvg;
+  const c = canvas(w, h);
   c.addEventListener("click", (ev) => start(ev.x / w));
   c.style.background = "#333";
   c.style.display = "block";
   c.id = "seekbar";
 
-  const current = pSvg.rect(0, 0, 1, h);
+  const current = rect(0, 0, 1, h);
   current.setAttribute("fill", "#666");
   c.change = (t) => current.setAttributeNS(null, "width", t * co);
   c.append(current);
 
   for (let i = num; i--; ) {
     let x = params.interval * i;
-    const li0 = pSvg.line(x * co, h, (x += params.fade) * co, 9);
-    const li1 = pSvg.line(x * co, 9, (x += params.solo) * co, 9);
-    const li2 = pSvg.line(x * co, 9, (x += params.fade) * co, h);
+    const li0 = line(x * co, h, (x += params.fade) * co, 9);
+    const li1 = line(x * co, 9, (x += params.solo) * co, 9);
+    const li2 = line(x * co, 9, (x += params.fade) * co, h);
     [li0, li1, li2].map((o) => o.setAttribute("stroke", "tan"));
     c.append(li0, li1, li2);
   }

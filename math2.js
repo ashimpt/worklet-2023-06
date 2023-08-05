@@ -1,6 +1,22 @@
 // prettier-ignore
-const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, random, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
+const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
 const sr = sampleRate;
+let random = Math.random;
+
+class XorShift {
+  constructor(seed) {
+    this.state = new Uint32Array([seed || 1]);
+  }
+  process = () => {
+    this.state[0] ^= this.state[0] << 13;
+    this.state[0] ^= this.state[0] >>> 17;
+    this.state[0] ^= this.state[0] << 5;
+    return this.state[0] / 0x100000000; // 2 ** 32
+  };
+  static create(seed) {
+    return new this(seed).process;
+  }
+}
 
 export const Math2 = {
   TAU: 2 * Math.PI,
@@ -28,39 +44,31 @@ export const Math2 = {
     }
     return array;
   },
+  XorShift: XorShift,
+  setSeed: (seed) => (random = XorShift.create(seed)),
 };
 
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { lerpArray, shuffle } = Math2;
 
-Math2.XorShift = class {
-  constructor(seed) {
-    this.state = new Uint32Array([seed || 1]);
-  }
-  process = () => {
-    this.state[0] ^= this.state[0] << 13;
-    this.state[0] ^= this.state[0] >>> 17;
-    this.state[0] ^= this.state[0] << 5;
-    return this.state[0] / 0x100000000; // 2 ** 32
-  };
-  static create(seed = 1) {
-    return new this(seed).process;
-  }
-};
-
-Math2.Loop = class extends Float32Array {
+Math2.Loop = class extends Float64Array {
   constructor(sec = 4) {
     super(sec * sr);
   }
   get(idx) {
-    if (idx != floor(idx)) return this.#getFloat(idx);
+    if (idx != floor(idx)) {
+      const im = mod(idx, this.length);
+      if (im > this.length - 1) {
+        return mix(this.at(-1), this[0], im - floor(im));
+      } else return lerpArray(this, im);
+    }
     return this[mod(idx, this.length)];
   }
-  #getFloat(idx) {
-    const im = mod(idx, this.length);
-    if (im > this.length - 1) {
-      return mix(this.at(-1), this[0], im - floor(im));
-    } else return lerpArray(this, im);
+  set(x, idx) {
+    return (this[idx % this.length] = x);
+  }
+  add(x, idx) {
+    this[idx % this.length] += x;
   }
   iGet(idx) {
     return this[mod(parseInt(idx), this.length)];
@@ -69,122 +77,114 @@ Math2.Loop = class extends Float32Array {
     const fb = this[mod(parseInt(idx - deltaIdx), this.length)];
     return (this[idx % this.length] = x + amp * fb);
   }
-  set(x, idx) {
-    return (this[idx % this.length] = x);
-  }
-  add(x, idx) {
-    this[idx % this.length] += x;
-  }
 };
 
-{
-  class Abstract {
-    constructor(options = {}) {
-      Object.assign(this, options);
-    }
-    static create(options = {}) {
-      const ins = new this();
-      Object.assign(ins, options);
-      return ins.process;
-    }
+class Abstract {
+  constructor(options = {}) {
+    Object.assign(this, options);
   }
-
-  Math2.Bag = class extends Abstract {
-    bag = [0, 1];
-    currentBag = [];
-    process = () => {
-      if (!this.currentBag.length)
-        this.currentBag.push(...shuffle([...this.bag]));
-      return this.currentBag.shift();
-    };
-  };
-
-  Math2.Lop = class extends Abstract {
-    k = exp(-1 / sr);
-    y1 = 0;
-    process = (inp) => (this.y1 = inp + (this.y1 - inp) * this.k);
-  };
-
-  Math2.SH = class extends Abstract {
-    l = 2;
-    x = 0;
-    process = (v, i, l = this.l) => {
-      if (i % l == 0) this.x = v;
-      return this.x;
-    };
-  };
-
-  Math2.Hold = class extends Abstract {
-    k = exp(-7 / sr);
-    l = sr / 10;
-    f = random;
-    x = 0;
-    y1 = 0;
-    process = (i, fnc) => {
-      if (i % this.l == 0) this.x = fnc ? fnc() : this.f();
-      const { x, y1, k } = this;
-      return (this.y1 = x + (y1 - x) * k);
-    };
-  };
-
-  const BiquadFilter = class extends Abstract {
-    x1 = 0;
-    x2 = 0;
-    y1 = 0;
-    y2 = 0;
-    process = (x0) => {
-      const { b0, b1, b2, a0, a1, a2 } = this;
-      const { x1, x2, y1, y2 } = this;
-      const y0 = (b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
-      [this.x1, this.x2, this.y1, this.y2] = [x0, x1, y0, y1];
-      return y0;
-    };
-    low = (f, q) => {
-      const w0 = 2 * PI * (f / sr);
-      const cosW0 = cos(w0);
-      const a = sin(w0) / (2 * q);
-      const b1 = (this.b1 = 1 - cosW0);
-      this.b2 = this.b0 = b1 / 2;
-      this.a0 = 1 + a;
-      this.a1 = -2 * cosW0;
-      this.a2 = 1 - a;
-    };
-    high = (f, q) => {
-      const w0 = 2 * PI * (f / sr);
-      const cosW0 = cos(w0);
-      const a = sin(w0) / (2 * q);
-      const b1 = (this.b1 = -1 - cosW0);
-      this.b2 = this.b0 = -b1 / 2;
-      this.a0 = 1 + a;
-      this.a1 = -2 * cosW0;
-      this.a2 = 1 - a;
-    };
-    band = (f, q) => {
-      const w0 = 2 * PI * (f / sr);
-      const sinW0 = sin(w0);
-      const a = sinW0 / (2 * q);
-      this.b2 = -(this.b0 = sinW0 / 2);
-      this.b1 = 0;
-      this.a0 = 1 + a;
-      this.a1 = -2 * cos(w0);
-      this.a2 = 1 - a;
-    };
-  };
-
-  Math2.BiquadFilter = BiquadFilter;
-  Math2.Filter = {
-    create: ({ type = "low", f = 800, q = 1, u = false } = {}) => {
-      if (f > sr / 2) {
-        console.warn(f, sr / 2);
-        f = sr / 2;
-      }
-      const instance = new BiquadFilter();
-      const update = instance[type];
-      const process = instance.process;
-      update(f, q);
-
-      if (!u) return process;
-      else return (x, f0 = f, q0 = q) => (update(f0, q0), process(x));
-    },
-  };
+  static create(options = {}) {
+    const ins = new this();
+    Object.assign(ins, options);
+    return ins.process;
+  }
 }
+
+Math2.Bag = class extends Abstract {
+  bag = [0, 1];
+  currentBag = [];
+  process = () => {
+    if (!this.currentBag.length)
+      this.currentBag.push(...shuffle([...this.bag]));
+    return this.currentBag.shift();
+  };
+};
+
+Math2.Lop = class extends Abstract {
+  k = exp(-1 / sr);
+  y1 = 0;
+  process = (inp) => (this.y1 = inp + (this.y1 - inp) * this.k);
+};
+
+Math2.SH = class extends Abstract {
+  l = 2;
+  x = 0;
+  process = (v, i, l = this.l) => {
+    if (i % l == 0) this.x = v;
+    return this.x;
+  };
+};
+
+Math2.Hold = class extends Abstract {
+  k = exp(-7 / sr);
+  l = sr / 10;
+  f = random;
+  x = 0;
+  y1 = 0;
+  process = (i, fnc) => {
+    if (i % this.l == 0) this.x = fnc ? fnc() : this.f();
+    const { x, y1, k } = this;
+    return (this.y1 = x + (y1 - x) * k);
+  };
+};
+
+const BiquadFilter = class extends Abstract {
+  x1 = 0;
+  x2 = 0;
+  y1 = 0;
+  y2 = 0;
+  process = (x0) => {
+    const { b0, b1, b2, a0, a1, a2 } = this;
+    const { x1, x2, y1, y2 } = this;
+    const y0 = (b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+    [this.x1, this.x2, this.y1, this.y2] = [x0, x1, y0, y1];
+    return y0;
+  };
+  low = (f, q) => {
+    const w0 = 2 * PI * (f / sr);
+    const cosW0 = cos(w0);
+    const a = sin(w0) / (2 * q);
+    const b1 = (this.b1 = 1 - cosW0);
+    this.b2 = this.b0 = b1 / 2;
+    this.a0 = 1 + a;
+    this.a1 = -2 * cosW0;
+    this.a2 = 1 - a;
+  };
+  high = (f, q) => {
+    const w0 = 2 * PI * (f / sr);
+    const cosW0 = cos(w0);
+    const a = sin(w0) / (2 * q);
+    const b1 = (this.b1 = -1 - cosW0);
+    this.b2 = this.b0 = -b1 / 2;
+    this.a0 = 1 + a;
+    this.a1 = -2 * cosW0;
+    this.a2 = 1 - a;
+  };
+  band = (f, q) => {
+    const w0 = 2 * PI * (f / sr);
+    const sinW0 = sin(w0);
+    const a = sinW0 / (2 * q);
+    this.b2 = -(this.b0 = sinW0 / 2);
+    this.b1 = 0;
+    this.a0 = 1 + a;
+    this.a1 = -2 * cos(w0);
+    this.a2 = 1 - a;
+  };
+};
+
+Math2.BiquadFilter = BiquadFilter;
+Math2.Filter = {
+  create: ({ type = "low", f = 800, q = 1, u = false } = {}) => {
+    if (f > sr / 2) {
+      console.warn(f, sr / 2);
+      f = sr / 2;
+    }
+    const instance = new BiquadFilter();
+    const update = instance[type];
+    const process = instance.process;
+    update(f, q);
+
+    if (!u) return process;
+    else return (x, f0 = f, q0 = q) => (update(f0, q0), process(x));
+  },
+};
