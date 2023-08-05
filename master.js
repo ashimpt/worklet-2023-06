@@ -29,7 +29,7 @@ const peakMeter = {
   sumSq: [1e-3, 1e-3],
   process(inp, spb) {
     const { peaks, sumSq } = this;
-    let secPeak = 0;
+    let blockPeak = 0;
     for (let ch = 2; ch--; ) {
       let chPeak = 0;
       for (let i = 0; i < spb; i++) {
@@ -38,9 +38,9 @@ const peakMeter = {
         sumSq[ch] += v * v;
       }
       peaks[ch] = max(peaks[ch], chPeak);
-      secPeak = max(secPeak, chPeak);
+      blockPeak = max(blockPeak, chPeak);
     }
-    this.value = max(this.value, secPeak);
+    this.value = max(this.value, blockPeak);
     this.peak = max(...peaks);
   },
   limit(inp, spb) {
