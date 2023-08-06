@@ -12,21 +12,21 @@
 
 canvas {
   background: #333;
+  display: block;
   width: 100vw;
-  display: block
 }
 
 #info {
   background: #333;
+  white-space: nowrap;
   width: 100vw;
-  white-space: pre-wrap;
 }
 
 #output {
-  width: 100vw;
   white-space: nowrap;
 }
 
 button {
-  padding: 0.5em
+  padding: 1em;
+  width: 50vw;
 }

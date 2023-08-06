@@ -27,7 +27,7 @@ addEventListener("load", () => {
 function createSeekBar() {
   const width = q("#output").offsetWidth;
   const [w, h] = [width, parseInt(width / 10)];
-  const co = w / params.totalDuration;
+  const wps = width / params.totalDuration;
 
   const { canvas, rect, line } = pSvg;
   const c = canvas(w, h);
@@ -38,14 +38,14 @@ function createSeekBar() {
 
   const current = rect(0, 0, 1, h);
   current.setAttribute("fill", "#666");
-  c.change = (t) => current.setAttributeNS(null, "width", t * co);
+  c.change = (t) => current.setAttributeNS(null, "width", t * wps);
   c.append(current);
 
   for (let i = num; i--; ) {
     let x = params.interval * i;
-    const li0 = line(x * co, h, (x += params.fade) * co, 9);
-    const li1 = line(x * co, 9, (x += params.solo) * co, 9);
-    const li2 = line(x * co, 9, (x += params.fade) * co, h);
+    const li0 = line(x * wps, h, (x += params.fade) * wps, 9);
+    const li1 = line(x * wps, 9, (x += params.solo) * wps, 9);
+    const li2 = line(x * wps, 9, (x += params.fade) * wps, h);
     [li0, li1, li2].map((o) => o.setAttribute("stroke", "tan"));
     c.append(li0, li1, li2);
   }
@@ -84,13 +84,7 @@ async function start(seekPos = 0) {
   // tracks
   for (let i = num; i--; ) await loadTrack(i, seekTime);
 
-  // analyser
-  analyser = new Analyser(q("canvas"), ctx);
-  ctx.addEventListener("statechange", (ev) => {
-    if (ctx && ctx.state == "running") analyser.startLoop();
-    else analyser.stopLoop();
-  });
-  master.connect(analyser.analyser);
+  createAnalyser();
 
   document.title = title;
   changeState("resume");
@@ -142,4 +136,13 @@ async function loadTrack(id, seekTime) {
     worklet.port.onmessage = rsl;
   });
   worklet.connect(master);
+}
+
+function createAnalyser() {
+  analyser = new Analyser(q("canvas"), ctx);
+  ctx.addEventListener("statechange", (ev) => {
+    if (ctx && ctx.state == "running") analyser.startLoop();
+    else analyser.stopLoop();
+  });
+  master.connect(analyser.analyser);
 }
