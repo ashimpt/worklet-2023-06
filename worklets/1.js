@@ -73,26 +73,34 @@ class Synth {
 }
 
 const synths = [new Synth(0), new Synth(1), new Synth(2)];
-const delays = [...Array(12)].map(() => new Loop());
-const srt = sr / 1000;
-
-function delay(data, spb, i0, i, t) {
-  for (; i0 < spb; i0++, t = ++i / sr) {
-    for (let ch = 2; ch--; ) {
-      const in0 = data[ch][i0];
-      let del = 39.99;
-      const b0 = delays[ch + 0].feedback(in0, i, del-- * srt, 0.85);
-      const b1 = delays[ch + 2].feedback(in0, i, del-- * srt, 0.86);
-      const b2 = delays[ch + 4].feedback(in0, i, del-- * srt, 0.87);
-      const b3 = delays[ch + 6].feedback(in0, i, del-- * srt, 0.88);
-      const b4 = delays[ch + 8].feedback(b0 - b1 + b2 - b3, i, 5e-3 * sr, 0.7);
-      const b5 = delays[ch + 10].feedback(b4 / 4, i, 1.7e-3 * sr, 0.7);
-      data[ch][i0] += 0.1 * b5;
-    }
-  }
-}
 
 process(1, function (data, spb, i0, i, t) {
   for (const cluster of synths) cluster.process(data, i0, i, t, spb);
-  delay(data, spb, i0, i, t);
+  reverb(data, spb, i0, i, t);
 });
+
+const delays = [...Array(14)].map(() => new Loop(1));
+const srt = sr / 1000;
+
+function reverb(data, spb, i0, i, t) {
+  for (; i0 < spb; i0++, t = ++i / sr) {
+    for (let ch = 2; ch--; ) delays[ch + 12].set(0.2 * data[ch][i0], i);
+    for (let ch = 2; ch--; ) {
+      const preOut = delays[ch + 12].iGet(i - 10e-3 * srt);
+
+      let combOut = 0;
+      for (let n = 0; n < 4; n++) {
+        const dl = mix(55 - ch / 5, 99 + ch / 7, n / 4);
+        const a0 = mix(0.8, 0.7, n / 3);
+        const comb = delays[ch + 2 * n];
+        const b = a0 * comb.iGet(i - dl * srt);
+        comb.set(preOut + b, i);
+        combOut += b / 4;
+      }
+
+      const apfOut0 = -delays[ch + +8].feedback(combOut, i, 5.0 * srt, 0.7);
+      const apfOut1 = -delays[ch + 10].feedback(apfOut0, i, 1.7 * srt, 0.7);
+      data[ch][i0] += apfOut1;
+    }
+  }
+}
