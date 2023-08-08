@@ -27,7 +27,7 @@ class Bird {
     this.d1 = rnd(0.03, 0.3, 2);
     this.count = 0;
     this.maxCount = floor(6 / (this.d0 + this.d1));
-    this.a0 = 0.8 * sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
+    this.a0 = 0.9 * sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
     if (this.a0 < 1e-5) this.a0 = 0;
   }
   process(data, i0, i, t) {
@@ -68,35 +68,73 @@ process(3, function (data, spb, i0, i, t) {
 const reverb = new (class Reverb {
   inputs = [0, 0];
   delays = [...Array(14)].map(() => new Loop(1));
-  srt = sr / 1000;
   process(data, i0, i) {
-    const { inputs, delays, lpo, lps, srt } = this;
-    for (let ch = 2; ch--; ) delays[ch + 12].set(0.063 * inputs[ch], i);
+    const { inputs, delays, lpo, lps } = this;
+    const srt = sr / 1000;
+
+    for (let ch = 2; ch--; ) delays[ch + 12].set(0.07 * inputs[ch], i);
 
     for (let ch = 2; ch--; ) {
       let earlyOut = 0;
-      for (let n = 0, num = 12; n < num; n++) {
-        const early = mix(5.777 - ch, 35 + ch, n / num);
-        const a = 0.15 * mix(1, 0.5, n / num) * (n % 2 ? 1 : 2);
-        earlyOut += a * delays[((ch + n) % 2) + 12].iGet(i - early * srt);
+      const earlyNum = 8;
+      for (let n = 0, c = ch; n < earlyNum; n++) {
+        const early = mix(5.777 - ch, 35 + ch, n / earlyNum);
+        const a = mix(1, 0.5, n / earlyNum) * (ch == c ? 2 : 1);
+        earlyOut += a * delays[(c++ % 2) + 12].iGet(i - early * srt);
       }
-      data[ch][i0] += earlyOut;
+      data[ch][i0] += 0.4 * earlyOut;
 
       const preOut = delays[ch + 12].iGet(i - 5e-3 * srt);
 
       let combOut = 0;
-      for (let n = 0; n < 4; n++) {
-        const dl = mix(31 + ch / 3, 39 - ch / 5, n / 4);
-        const a0 = mix(0.8, 0.7, n / 3);
+      const combNum = 4;
+      for (let n = 0; n < combNum; n++) {
+        const dl = mix(31.1 + ch / 3, 39 - ch / 5, n / combNum);
+        const a0 = mix(0.8, 0.7, n / combNum);
         const comb = delays[ch + 2 * n];
         const b = a0 * comb.iGet(i - dl * srt);
         comb.set(preOut + b, i);
         combOut += b / 4;
       }
 
-      const apfOut0 = -delays[ch + +8].feedback(combOut, i, 5.0 * srt, 0.7);
-      const apfOut1 = -delays[ch + 10].feedback(apfOut0, i, 1.7 * srt, 0.7);
-      data[ch][i0] += apfOut1;
+      // const apfOut0 = -delays[ch + +8].feedback(combOut, i, 5.0 * srt, 0.7);
+      // const apfOut1 = -delays[ch + 10].feedback(apfOut0, i, 1.7 * srt, 0.7);
+      // data[ch][i0] += apfOut1;
+
+      let apfOut = 0;
+      const apfNum = 4;
+      const apf = delays[ch + 8];
+      for (let n = 0; n < apfNum; n++) {
+        // const dt = mix(1.555, 10, sqrt(n / apfNum));
+        // apfOut += apf.iGet(i - dt * srt);
+        apfOut += apf.iGet(i - apfLengths[n]);
+      }
+      apf.set(combOut + (0.7 / apfNum) * apfOut, i);
+      data[ch][i0] += apfOut;
     }
   }
 })();
+
+const apfLengths = ((o = [], num = 4) => {
+  for (let n = 0; n < num; n++) {
+    const dt = mix(1.555, 10, sqrt(n / num));
+    o[n] = ceilPrime(dt * (sr / 1000));
+  }
+  return o;
+})();
+
+function ceilPrime(v) {
+  v = ceil(v);
+  while (!isPrime(v)) v++;
+  return v;
+}
+
+function isPrime(v) {
+  if (v < 3) return v == 2;
+  for (let i = 3, l = sqrt(v); i <= l; i += 2) {
+    if (v / i == floor(v / i)) return false;
+  }
+  return true;
+}
+
+// http://www.ari-co.co.jp/service/soft/reverb-2.htm
