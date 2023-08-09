@@ -3,8 +3,10 @@ const num = 7;
 addEventListener("load", () => {
   if (!params.sr) params.sr = 24e3;
   if (!params.bit) params.bit = 16;
-  if (!params.fade && params.fade !== 0) params.fade = 60;
-  if (!params.solo && params.solo !== 0) params.solo = 60;
+  if (params.fade === undefined) params.fade = 60;
+  if (params.solo === undefined) params.solo = 60;
+  if (params.anlz === undefined) params.anlz = 1;
+  if (params.tet12 === undefined) params.tet12 = 1;
   params.duration = 2 * params.fade + params.solo;
   params.interval = params.fade + params.solo;
   params.totalDuration = (num - 1) * params.interval + params.duration;
@@ -84,7 +86,7 @@ async function start(seekPos = 0) {
   // tracks
   for (let i = num; i--; ) await loadTrack(i, seekTime);
 
-  createAnalyser();
+  if (params.anlz) createAnalyser();
 
   document.title = title;
   changeState("resume");

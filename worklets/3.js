@@ -6,6 +6,7 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
 setup(Math2);
+const g2 = 98;
 
 const numBirds = 10;
 const birdBagEls = [...Array(40)].map((v, i) => 10 ** -(i % 10));
@@ -20,14 +21,14 @@ class Bird {
     this.update();
   }
   update() {
-    this.f0 = mix(100, 1600, Math2.rndTriangular(0.4));
-    this.f1 = mix(100, 1600, Math2.rndTriangular(0.2));
+    this.f0 = mix(g2, g2 * 2 ** 4, Math2.rndTriangular(0.4));
+    this.f1 = mix(g2, g2 * 2 ** 4, Math2.rndTriangular(0.2));
     this.e0 = rnd(0.1, 0.9);
     this.d0 = rnd(0.03, 0.2, 1); // rest
     this.d1 = rnd(0.03, 0.3, 2);
     this.count = 0;
     this.maxCount = floor(6 / (this.d0 + this.d1));
-    this.a0 = 0.9 * sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
+    this.a0 = 0.8 * sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
     if (this.a0 < 1e-5) this.a0 = 0;
   }
   process(data, i0, i, t) {

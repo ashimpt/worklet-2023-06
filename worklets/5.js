@@ -6,34 +6,42 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
 setup(Math2);
+const g2 = 98;
 
 const lopO = Lop.create({ k: exp(-7 / sr) });
-const func0 = () => rnd() ** 0.5;
-const hold0 = Hold.create({ k: exp(-9 / sr), l: sr / 8, f: func0 });
-const hold1 = Hold.create({ k: exp(-9 / sr), l: sr / 3, f: func0 });
+const rndSq = () => rnd() ** 0.5;
+const rndLfo0 = Hold.create({ k: exp(-9 / sr), l: sr / 8, f: rndSq });
+const rndLfo1 = Hold.create({ k: exp(-9 / sr), l: sr / 3, f: rndSq });
+const rndTg = () => (rnd(3) < 1 ? 1 : 0);
+const rndToggle = Hold.create({ k: exp(-99 / sr), l: sr / 1, f: rndTg });
 
 const tapes = [0, 1].map(() => new Loop(4));
 const bag = Bag.create({ bag: [-2, -1, 1, 2] });
 const hps = [0, 1].map(() => Filter.create({ type: "high", f: 20, q: 0.7 }));
 const lps = [0, 1].map(() => Filter.create({ f: 10e3 }));
+const lop0 = Lop.create({ k: exp(-333 / sr) });
 
 let oct = 0;
 let p1 = 0;
+let fMod = 8;
 process(5, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     if (!i || (i % (sr / 4) == 0 && rnd(4) < 1)) {
       oct = floor(rnd(0, 4, 2));
     }
 
-    const p0 = TAU * 100 * t;
+    const p0 = TAU * g2 * t;
     const o = lopO(oct);
-    p1 += TAU * 100 * 2 ** o * (1 / sr);
+    p1 += TAU * g2 * 2 ** o * (1 / sr);
     const b1a = mix(4, 1, o / 3) * sin(2 * p1);
-    const b1 = 1.5 * hold0(i) * am(3 * t) ** 7 * sin(p0 / 2 + b1a);
-    const b2 = 0.3 * hold1(i) * sin(TAU * 2.5 * t + sin(32 * p0));
+    const b1 = 1.5 * rndLfo0(i) * am(3 * t) ** 7 * sin(p0 / 2 + b1a); // beat
+    const w0 = TAU * phase(2.5 * t, 1) ** 2;
+    const b2 = 0.3 * rndLfo1(i) * sin(w0 + sin(32 * p0)); // high
     const b0 = sin(p0 + b1 + b2);
-    const b3 = b0 * sin(p1 + sin(0.5 * p1));
-    const b = 0.2 * mix(b0, b3, 0.5);
+    if (i % sr == 0) fMod = round(rnd(4, 10));
+    const a3 = lop0(mix(1, (fMod * t) % 1 < 0.5, rndToggle(i)));
+    const b3 = sin(p1 + sin(p1 / 2));
+    const b = 0.2 * mix(b0, a3 * b0 * b3, 0.7);
     for (let ch = 2; ch--; ) data[ch][i0] += b;
 
     for (let ch = 2; ch--; ) {

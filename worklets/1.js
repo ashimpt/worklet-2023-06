@@ -6,11 +6,11 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
 setup(Math2);
-
-const amp = 0.15;
+const g2 = 98;
+const amp = 0.166;
 
 function syn(data, n, i, t, n0, a1, pp) {
-  const f = 100 * 2 ** ((n + n0) / 9);
+  const f = g2 * 2 ** ((n + n0) / 9);
   const p = TAU * f * t;
   const b = amp * a1 * sin(p);
   for (let ch = 2; ch--; ) data[ch][i] += pan(ch ? pp : 1 - pp) * b;

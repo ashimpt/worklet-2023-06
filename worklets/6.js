@@ -8,7 +8,7 @@ import { sr, setup, process } from "../mod.js";
 
 let tet = 9;
 let keys = [0, 3, 4, 5, 8];
-const freq = (n) => 100 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
+const freq = (n) => 98 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
 setup(Math2, (params) => {
   if (params.tet12) tet = 12;
   if (params.tet12) keys = [0, 4, 5, 7, 11];
