@@ -1,18 +1,14 @@
 // prettier-ignore
-const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, random, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
-import { Math2 } from "../math2.js";
+const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
+import { Math2, sr, params, process } from "../mod.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
-import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
+const opt = { id: 6, amp: 0.4 };
 
-let tet = 9;
-let keys = [0, 3, 4, 5, 8];
+const tet = params.tet12 ? 12 : 9;
+const keys = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
 const freq = (n) => 98 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
-setup(Math2, (params) => {
-  if (params.tet12) tet = 12;
-  if (params.tet12) keys = [0, 4, 5, 7, 11];
-});
 
 class Synth {
   bass = [3, -1];
@@ -41,12 +37,12 @@ const synths = [0, 1, 2, 3, 4, 5].map((v) => new Synth(v));
 
 const aux0 = [0, 0];
 
-process(6, function (data, spb, i0, i, t) {
+process(opt, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const speed = am(t / 32);
     for (const s of synths) s.process(data, i0, i, t, speed);
 
-    for (let ch = 2; ch--; ) data[ch][i0] = 0.45 * tanh(data[ch][i0]);
+    for (let ch = 2; ch--; ) data[ch][i0] = tanh(data[ch][i0]);
 
     aux0[0] = aux0[1] = 0;
     createBackground(data, spb, i0, i, t);

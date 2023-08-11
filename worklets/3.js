@@ -1,11 +1,10 @@
 // prettier-ignore
-const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, random, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
-import { Math2 } from "../math2.js";
+const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
+import { Math2, sr, params, process } from "../mod.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
-import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
-setup(Math2);
+const opt = { id: 3, amp: 0.85 };
 const g2 = 98;
 
 const numBirds = 10;
@@ -28,7 +27,7 @@ class Bird {
     this.d1 = rnd(0.03, 0.3, 2);
     this.count = 0;
     this.maxCount = floor(6 / (this.d0 + this.d1));
-    this.a0 = 0.8 * sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
+    this.a0 = sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
     if (this.a0 < 1e-5) this.a0 = 0;
   }
   process(data, i0, i, t) {
@@ -51,7 +50,7 @@ class Bird {
 const birds = [...Array(numBirds)].map((v, i) => new Bird(i));
 const tapes = [0, 1].map(() => new Loop(9));
 
-process(3, function (data, spb, i0, i, t) {
+process(opt, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     for (let b of birds) b.process(data, i0, i, t);
 
@@ -69,6 +68,18 @@ process(3, function (data, spb, i0, i, t) {
 const reverb = new (class Reverb {
   inputs = [0, 0];
   delays = [...Array(14)].map(() => new Loop(1));
+  apfLengths = [];
+  constructor() {
+    for (let n = 0, num = 4; n < num; n++) {
+      const dt = mix(1.555, 10, sqrt(n / num));
+      this.apfLengths[n] = this.ceilPrime(dt * 1e-3 * sr);
+    }
+  }
+  ceilPrime(v) {
+    v = ceil(v);
+    while (!Math2.isPrime(v)) v++;
+    return v;
+  }
   process(data, i0, i) {
     const { inputs, delays, lpo, lps } = this;
     const srt = sr / 1000;
@@ -84,16 +95,18 @@ const reverb = new (class Reverb {
         earlyOut += a * delays[(c++ % 2) + 12].iGet(i - early * srt);
       }
       data[ch][i0] += 0.4 * earlyOut;
+    }
 
+    for (let ch = 2; ch--; ) {
       const preOut = delays[ch + 12].iGet(i - 5e-3 * srt);
 
       let combOut = 0;
       const combNum = 4;
       for (let n = 0; n < combNum; n++) {
-        const dl = mix(31.1 + ch / 3, 39 - ch / 5, n / combNum);
+        const dt = mix(31.1 + ch / 3, 39 - ch / 5, n / combNum);
         const a0 = mix(0.8, 0.7, n / combNum);
         const comb = delays[ch + 2 * n];
-        const b = a0 * comb.iGet(i - dl * srt);
+        const b = a0 * comb.iGet(i - dt * srt);
         comb.set(preOut + b, i);
         combOut += b / 4;
       }
@@ -108,34 +121,11 @@ const reverb = new (class Reverb {
       for (let n = 0; n < apfNum; n++) {
         // const dt = mix(1.555, 10, sqrt(n / apfNum));
         // apfOut += apf.iGet(i - dt * srt);
-        apfOut += apf.iGet(i - apfLengths[n]);
+        apfOut += apf.iGet(i - this.apfLengths[n]);
       }
       apf.set(combOut + (0.7 / apfNum) * apfOut, i);
       data[ch][i0] += apfOut;
     }
+    // http://www.ari-co.co.jp/service/soft/reverb-2.htm
   }
 })();
-
-const apfLengths = ((o = [], num = 4) => {
-  for (let n = 0; n < num; n++) {
-    const dt = mix(1.555, 10, sqrt(n / num));
-    o[n] = ceilPrime(dt * (sr / 1000));
-  }
-  return o;
-})();
-
-function ceilPrime(v) {
-  v = ceil(v);
-  while (!isPrime(v)) v++;
-  return v;
-}
-
-function isPrime(v) {
-  if (v < 3) return v == 2;
-  for (let i = 3, l = sqrt(v); i <= l; i += 2) {
-    if (v / i == floor(v / i)) return false;
-  }
-  return true;
-}
-
-// http://www.ari-co.co.jp/service/soft/reverb-2.htm

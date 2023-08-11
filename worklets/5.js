@@ -1,30 +1,30 @@
 // prettier-ignore
-const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, random, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
-import { Math2 } from "../math2.js";
+const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
+import { Math2, sr, params, process } from "../mod.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
-import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
-setup(Math2);
+const opt = { id: 5, amp: 0.206 };
 const g2 = 98;
+let time = 0;
 
 const lopO = Lop.create({ k: exp(-7 / sr) });
 const rndSq = () => rnd() ** 0.5;
 const rndLfo0 = Hold.create({ k: exp(-9 / sr), l: sr / 8, f: rndSq });
 const rndLfo1 = Hold.create({ k: exp(-9 / sr), l: sr / 3, f: rndSq });
-const rndTg = () => (rnd(3) < 1 ? 1 : 0);
+const rndTg = () => (rnd(9 - 6 * am(time / 180)) < 1 ? 1 : 0);
 const rndToggle = Hold.create({ k: exp(-99 / sr), l: sr / 1, f: rndTg });
 
 const tapes = [0, 1].map(() => new Loop(4));
 const bag = Bag.create({ bag: [-2, -1, 1, 2] });
-const hps = [0, 1].map(() => Filter.create({ type: "high", f: 20, q: 0.7 }));
 const lps = [0, 1].map(() => Filter.create({ f: 10e3 }));
 const lop0 = Lop.create({ k: exp(-333 / sr) });
 
 let oct = 0;
 let p1 = 0;
 let fMod = 8;
-process(5, function (data, spb, i0, i, t) {
+process(opt, function (data, spb, i0, i, t) {
+  time = t;
   for (; i0 < spb; i0++, t = ++i / sr) {
     if (!i || (i % (sr / 4) == 0 && rnd(4) < 1)) {
       oct = floor(rnd(0, 4, 2));
@@ -41,7 +41,7 @@ process(5, function (data, spb, i0, i, t) {
     if (i % sr == 0) fMod = round(rnd(4, 10));
     const a3 = lop0(mix(1, (fMod * t) % 1 < 0.5, rndToggle(i)));
     const b3 = sin(p1 + sin(p1 / 2));
-    const b = 0.2 * mix(b0, a3 * b0 * b3, 0.7);
+    const b = mix(b0, a3 * b0 * b3, 0.7);
     for (let ch = 2; ch--; ) data[ch][i0] += b;
 
     for (let ch = 2; ch--; ) {
@@ -55,7 +55,7 @@ process(5, function (data, spb, i0, i, t) {
       const fb1 = e0 * tapes[ch & 1].get(i - sr + tape.x);
       const fb = mix(-fb0, fb1, 0.3);
       tape.set(b + 0.93 * fb, i);
-      data[ch][i0] += 1.2 * fb;
+      data[ch][i0] += 1.25 * fb;
 
       tape.x += tape.v - 1;
     }
@@ -63,6 +63,6 @@ process(5, function (data, spb, i0, i, t) {
 
   for (let ch = 2; ch--; )
     for (let i = 0; i < spb; i++) {
-      data[ch][i] = lps[ch](hps[ch](data[ch][i]));
+      data[ch][i] = lps[ch](data[ch][i]);
     }
 });

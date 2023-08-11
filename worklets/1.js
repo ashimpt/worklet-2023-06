@@ -1,18 +1,16 @@
 // prettier-ignore
-const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, random, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
-import { Math2 } from "../math2.js";
+const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
+import { Math2, sr, params, process } from "../mod.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
-import { sr, setup, process } from "../mod.js";
 ////////////////////////////////////////////////////////////////////////////////
-setup(Math2);
+const opt = { id: 1, amp: 0.17 };
 const g2 = 98;
-const amp = 0.166;
 
 function syn(data, n, i, t, n0, a1, pp) {
   const f = g2 * 2 ** ((n + n0) / 9);
   const p = TAU * f * t;
-  const b = amp * a1 * sin(p);
+  const b = a1 * sin(p);
   for (let ch = 2; ch--; ) data[ch][i] += pan(ch ? pp : 1 - pp) * b;
 }
 
@@ -74,7 +72,7 @@ class Synth {
 
 const synths = [new Synth(0), new Synth(1), new Synth(2)];
 
-process(1, function (data, spb, i0, i, t) {
+process(opt, function (data, spb, i0, i, t) {
   for (const cluster of synths) cluster.process(data, i0, i, t, spb);
   reverb(data, spb, i0, i, t);
 });

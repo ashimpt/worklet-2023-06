@@ -1,7 +1,6 @@
 // prettier-ignore
-const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
+const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, /*random,*/ round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
 const sr = sampleRate;
-let random = Math.random;
 
 class XorShift {
   constructor(seed) {
@@ -18,35 +17,47 @@ class XorShift {
   }
 }
 
-export const Math2 = {
-  TAU: 2 * Math.PI,
-  mod: (v, m = 1) => ((v % m) + m) % m,
-  mix: (a, b = 1, ratio = 0.5) => a + (b - a) * ratio,
-  clip: (x, lo = 0, hi = 1) => max(lo, min(hi, x)),
-  phase: (x, l) => mod(x, l) / l,
-  crush: (a, b = 0.5) => round(a / b) * b,
-  pot: (x, k = 1) => x / (1 + (1 - x) * k),
-  pan: (x) => x / (0.4 + 0.6 * x),
-  am: (phase) => 0.5 - 0.5 * cos(2 * PI * phase),
-  asd: (x, a = 0.01, d = 1 - a) => min((x % 1) / a, 1, (1 - (x % 1)) / d),
-  rnd: (lo = 1, hi = 0, e = 1) => lo + (hi - lo) * random() ** e,
-  rndTriangular: (med = 0.5, r = random()) =>
-    r < med ? sqrt(r / med) * med : 1 - sqrt((1 - r) / (1 - med)) * (1 - med),
+export const Math2 = new (class {
+  random = Math.random;
+  XorShift = XorShift;
+  setSeed = (seed) => {
+    Math2.random = XorShift.create(seed);
+  };
+  TAU = 2 * Math.PI;
+  mod = (v, m = 1) => ((v % m) + m) % m;
+  mix = (a, b = 1, ratio = 0.5) => a + (b - a) * ratio;
+  clip = (x, lo = 0, hi = 1) => max(lo, min(hi, x));
+  phase = (x, l = 1) => mod(x, l) / l;
+  crush = (a, b = 0.5, fnc = round) => fnc(a / b) * b;
+  pot = (x, k = 1) => x / (1 + (1 - x) * k);
+  pan = (x) => x / (0.4 + 0.6 * x);
+  am = (phase) => 0.5 - 0.5 * cos(2 * PI * phase);
+  asd = (x, a = 0.01, d = 1 - a) => min((x % 1) / a, 1, (1 - (x % 1)) / d);
+  rnd = (lo = 1, hi = 0, e = 1) => lo + (hi - lo) * Math2.random() ** e;
+  rndTriangular = (med = 0.5, r = Math2.random()) =>
+    r < med ? sqrt(r / med) * med : 1 - sqrt((1 - r) / (1 - med)) * (1 - med);
   lerpArray(arr, x) {
     const fx = floor(x);
     const d0 = arr[fx];
     return d0 + (arr[fx + 1] - d0) * (x - fx) || 0;
-  },
+  }
   shuffle(array) {
     for (let i = 0; i < array.length; i++) {
-      const r = floor(array.length * random());
+      const r = floor(array.length * Math2.random());
       [array[i], array[r]] = [array[r], array[i]];
     }
     return array;
-  },
-  XorShift: XorShift,
-  setSeed: (seed) => (random = XorShift.create(seed)),
-};
+  }
+  isPrime(v) {
+    // if (!Number.isInteger(v)) throw new Error("isPrime");
+    if (v < 3) return v == 2;
+    if (Number.isInteger(v / 2)) return false;
+    for (let i = 3, l = sqrt(v); i <= l; i += 2) {
+      if (Number.isInteger(v / i)) return false;
+    }
+    return true;
+  }
+})();
 
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { lerpArray, shuffle } = Math2;
@@ -56,7 +67,7 @@ Math2.Loop = class extends Float64Array {
     super(sec * sr);
   }
   get(idx) {
-    if (idx != floor(idx)) {
+    if (!Number.isInteger(idx)) {
       const im = mod(idx, this.length);
       if (im > this.length - 1) {
         return mix(this.at(-1), this[0], im - floor(im));
@@ -118,7 +129,7 @@ Math2.SH = class extends Abstract {
 Math2.Hold = class extends Abstract {
   k = exp(-7 / sr);
   l = sr / 10;
-  f = random;
+  f = Math2.random;
   x = 0;
   y1 = 0;
   process = (i, fnc) => {

@@ -1,4 +1,8 @@
 const { max, min, abs, round, floor, log10, sqrt } = Math;
+import { Math2 } from "./math2.js";
+import { params } from "./mod.js";
+
+const hps = [0, 1].map(() => Math2.Filter.create({ type: "high", f: 20 }));
 const sr = sampleRate;
 let writer;
 
@@ -58,13 +62,14 @@ const peakMeter = {
 };
 
 class processor extends AudioWorkletProcessor {
-  params;
   seekFrame = 0;
   length = 0;
   constructor(...args) {
     super(...args);
     this.port.onmessage = ({ data }) => {
-      this.params = data;
+      Object.assign(params, data);
+      if (data.seed) Math2.setSeed(data.seed);
+
       this.seekFrame = round(sr * data.seekTime);
       this.length = data.totalDuration * sr;
 
@@ -81,13 +86,14 @@ class processor extends AudioWorkletProcessor {
     if (idx >= this.length) {
       if (writer) writer.post(this.port, peakMeter.peak);
       this.port.postMessage({ end: 1 });
+      if (ampData[0]) console.log({ ampData });
       return;
     }
 
     const spb = oup[0].length;
     for (let ch = 2; ch--; ) {
       for (let i = 0; i < spb; i++) {
-        oup[ch][i] = inp[ch][i] || 0;
+        oup[ch][i] = hps[ch](inp[ch][i] || 0);
       }
     }
 
@@ -106,9 +112,13 @@ class processor extends AudioWorkletProcessor {
   secProcess(spb, idx, ct) {
     const t = ct + (currentFrame ? 1 : 0);
 
-    const warn = this.params.warn;
-    if (warn && peakMeter.value > warn / 100) {
-      console.log({ amp: peakMeter.value.toFixed(3), t });
+    if (params.warn) {
+      const min = floor(t / 60);
+      ampData[min] = max(ampData[min] || 0, peakMeter.value);
+
+      if (peakMeter.value > params.warn / 100) {
+        console.warn({ amp: peakMeter.value.toFixed(3), t });
+      }
     }
 
     peakMeter.post(this.port, idx + spb, t);
@@ -116,4 +126,5 @@ class processor extends AudioWorkletProcessor {
   }
 }
 
+const ampData = [];
 registerProcessor("master", processor);
