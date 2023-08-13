@@ -7,65 +7,76 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 const opt = { id: 1, amp: 0.17 };
 const g2 = 98;
 
-function syn(data, n, i, t, n0, a1, pp) {
-  const f = g2 * 2 ** ((n + n0) / 9);
-  const p = TAU * f * t;
-  const b = a1 * sin(p);
-  for (let ch = 2; ch--; ) data[ch][i] += pan(ch ? pp : 1 - pp) * b;
-}
-
 class Synth {
   env = 1e-5;
   pp = 0.5;
   end = 0;
   lop0 = Lop.create({ k: exp(-35 / sr) });
   constructor(id) {
-    const bag = [...Array([4, 2, 1].at(id))].map((v, i) => i);
-    this.bag = Bag.create({ bag });
-    this.dividend = [2, 4, 8].at(id);
-    this.bottom = [18, 9, 0].at(id);
+    const opt = [
+      { bottom: 18, maxNumerator: 8, denominators: [32, 16, 12, 8] },
+      { bottom: +9, maxNumerator: 4, denominators: [16, +6, +4, 2] },
+      { bottom: +0, maxNumerator: 2, denominators: [+8, +3, +2, 1] },
+    ].at(id);
+    Object.assign(this, opt);
 
-    this.n0 = this.bottom;
-    this.update(1);
+    this.denominatorBag = Bag.create({ bag: opt.denominators });
+
+    this.rest = 1;
   }
-  update(init) {
-    this.divisor = 2 ** (1 + this.bag());
-    this.vel = [4, 8, 12].at(rnd(3));
-    if (!this.rest && !init) return;
-    const pre = this.voices;
-    while (pre == this.voices) this.voices = [2, 4, 6].at(rnd(3));
-    this.a0 = (1 / this.voices) ** 0.667;
+  update() {
+    this.denominator = this.denominatorBag();
+    this.count = 0;
+    this.updateCount = clip(ceil(rnd(3) * this.denominator), 4, 32);
+    const vel = [4, 8, 12].at(rnd(3)); // 1e-5 * exp(11.5) = 0.98...
+    this.aVel = exp(+vel / sr);
+    this.dVel = exp(-vel / sr);
+    const pre = this.overtones;
+    while (pre == this.overtones) this.overtones = [2, 4, 6].at(rnd(3));
+    this.a0 = (1 / this.overtones) ** 0.667;
+    this.rest = false;
   }
   trigger(i) {
-    const pre = this.n0;
-    while (pre == this.n0) this.n0 = this.bottom + floor(rnd(27));
-    this.dir = 1;
+    if (this.rest) this.update();
+
+    const pre = this.note;
+    while (pre == this.note) this.note = this.bottom + floor(rnd(27));
     this.pp = rnd();
-
-    if (rnd(6) < 1 || this.rest) this.update();
-
+    this.dir = 1;
     this.start = i;
-    const dr = ceil(rnd(this.dividend)) / this.divisor;
+    const dr = ceil(rnd(this.maxNumerator)) / this.denominator;
     this.end = i + round(dr * sr);
 
-    if (rnd(20) < 1 && !this.rest) {
-      this.end += sr;
+    if (this.count == this.updateCount) {
+      this.end = crush(this.end + rnd(1, 4) * sr, sr / 2);
       this.rest = true;
-    } else this.rest = false;
+    }
+
+    this.count++;
   }
   process(data, i0, i, t, spb) {
     for (; i0 < spb; i0++, t = ++i / sr) {
       if (i >= this.end) this.trigger(i);
-      const { dir, n0, start, end, pp, vel, voices, a0 } = this;
+      let { note, start, end, env } = this;
 
-      if (this.env == 1) this.dir = 0;
-      const tmp = this.env * exp((this.dir ? vel : -vel) / sr);
-      this.env = clip(tmp, 1e-5, 1);
+      env *= this.dir ? this.aVel : this.dVel;
+      this.env = env = clip(env, 1e-5, 1);
+      if (env == 1) this.dir = 0;
 
       const e0 = asd((i - start) / (end - start), 0.01, 0.01);
-      const a1 = a0 * this.env * e0;
-      if (a1 <= 1e-5) continue;
-      for (let n = voices; n--; ) syn(data, n, i0, t, n0, a1, this.lop0(pp));
+
+      if (env * e0 <= 1e-5) continue;
+
+      const a1 = this.a0 * env * e0;
+      const pp0 = this.lop0(this.pp);
+      const aL = a1 * pan(1 - pp0);
+      const aR = a1 * pan(pp0);
+      for (let n = this.overtones; n--; ) {
+        const f = g2 * 2 ** ((note + n) / 9);
+        const b = sin(TAU * f * t);
+        data[0][i0] += aL * b;
+        data[1][i0] += aR * b;
+      }
     }
   }
 }
@@ -73,7 +84,7 @@ class Synth {
 const synths = [new Synth(0), new Synth(1), new Synth(2)];
 
 process(opt, function (data, spb, i0, i, t) {
-  for (const cluster of synths) cluster.process(data, i0, i, t, spb);
+  for (const synth of synths) synth.process(data, i0, i, t, spb);
   reverb(data, spb, i0, i, t);
 });
 

@@ -115,7 +115,7 @@ class processor extends AudioWorkletProcessor {
     if (params.warn) {
       const min = floor(t / 60);
       ampData[min] = max(ampData[min] || 0, peakMeter.value);
-
+      if (floor(t) % 60 == 0) console.log(ampData.at(-2) || 0);
       if (peakMeter.value > params.warn / 100) {
         console.warn({ amp: peakMeter.value.toFixed(3), t });
       }

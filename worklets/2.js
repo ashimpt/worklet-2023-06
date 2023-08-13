@@ -4,18 +4,20 @@ import { Math2, sr, params, process } from "../mod.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 ////////////////////////////////////////////////////////////////////////////////
-const opt = { id: 2, amp: 0.256 };
+const opt = { id: 2, amp: 0.255 };
 
 const tet = params.tet12 ? 12 : 9;
-const keys = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
-const freq = (n) => 98 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
+const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
+const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 
 const rndMel = rnd();
 const mel1 = (t) => round(7 * am(3 * t + 0.5 * am(5 * t)) + 3 * am(t));
 const mel0 = (t) => mel1(25e-3 * t + rndMel) + 5 * (floor(t / 20) % 2);
 
+const fncFltr = (o) => o.i < o.l;
 let list = [];
 let count = 0;
+
 function createNote(t) {
   const pp = (count++ % 5) / 4;
   const n = mel0(t);
@@ -29,24 +31,52 @@ function createNote(t) {
   return { i: 0, n, f, o, pp, long, l, fm };
 }
 
+const env = (t, dr) => max(0, 1 - t / dr);
+const tape = new Loop();
+const bp0 = Filter.create({ type: "band", u: 1 });
+let aux0 = 0;
+
+function synth(data, i0, t, s) {
+  const { i, l, long, o, f, fm, pp } = s;
+  const t0 = i / sr;
+  const p0 = i / l;
+  const p = TAU * f * t0;
+  let b = mix(0.7, 1, o / 4);
+  if (long) {
+    const a1 = (5 / o) * asd(t + 4 * asd(t / 4.5, 0.5), 0.3, 0.3);
+    const b1 = a1 * sin(fm * p);
+    const e0 = 0.4 * asd(p0, 1e-3, 1e-3);
+    b *= 0.7 * e0 * sin(p + b1);
+  } else {
+    const b0a = 2 * env(t0, 0.02) * sin(3 * p);
+    const b0 = (5 / o) * env(t0, 0.1) * sin(2 * p + b0a);
+    const b1 = (200 / f) * env(t0, 0.2 / o) * sin(5 * p);
+    const a1 = f < 201 ? 0 : (3 / o) * (t0 / t0 ** t0);
+    const b2 = f < 201 ? 0 : a1 * mix(sin(3 * p), sin(3.015 * p));
+    const e0 = asd(p0, 0.01);
+    b *= 1.0 * e0 * sin(p + b0 + b1 + b2);
+    aux0 += b;
+  }
+  for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
+  s.i++;
+}
+
 let p0 = 0;
 let b0 = 0;
 let f0;
 const lop0 = Lop.create({ k: exp(-33 / sr) });
 
-function synth(data, i0, i, t) {
+function monoSynth(data, i0, i, t) {
   const vb = 2 ** (30e-3 * sin(TAU * 5 * t));
   p0 += TAU * (f0 * vb) * (1 / sr);
-  b0 = sin(p0 + lop0(min(1, 400 / f0)) * b0);
-  for (let ch = 2; ch--; ) data[ch][i0] += 0.11 * b0;
+  b0 = sin(p0 + lop0(min(1, 600 / f0)) * b0);
+  for (let ch = 2; ch--; ) data[ch][i0] += 0.12 * b0;
 }
 
-const env = (t, dr) => max(0, 1 - t / dr);
-const tape = new Loop();
-const bp0 = Filter.create({ type: "band", u: 1 });
 const revs = [0, 1].map(() => new Loop());
-const fncFltr = (o) => o.i < o.l;
-let aux0 = 0;
+const lfoBottom = freq(18) + 50;
+const lfoTop = freq(19) - 50;
+const lfoOct = log2(lfoTop / lfoBottom);
 
 process(opt, function (data, spb, i0, i, t) {
   f0 = 2 * freq(mel0(t));
@@ -58,39 +88,18 @@ process(opt, function (data, spb, i0, i, t) {
     }
 
     aux0 = 0;
-    for (const s of list) {
-      const { i, l, long, o, f, fm, pp } = s;
-      const t0 = i / sr;
-      const p0 = i / l;
-      const p = TAU * f * t0;
-      let b = mix(0.7, 1, o / 4);
-      if (long) {
-        const a1 = (5 / o) * asd(t + 4 * asd(t / 4.5, 0.5), 0.3, 0.3);
-        const b1 = a1 * sin(fm * p);
-        const e0 = 0.4 * asd(p0, 1e-3, 1e-3);
-        b *= 0.7 * e0 * sin(p + b1);
-      } else {
-        const b0a = 2 * env(t0, 0.02) * sin(3 * p);
-        const b0 = (5 / o) * env(t0, 0.1) * sin(2 * p + b0a);
-        const b1 = (200 / f) * env(t0, 0.2 / o) * sin(5 * p);
-        const a1 = f < 201 ? 0 : (3 / o) * (t0 / t0 ** t0);
-        const b2 = f < 201 ? 0 : a1 * mix(sin(3 * p), sin(3.015 * p));
-        const e0 = asd(p0, 0.01);
-        b *= 1.0 * e0 * sin(p + b0 + b1 + b2);
-        aux0 += b;
-      }
-      for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
-      s.i++;
-    }
+    for (const s of list) synth(data, i0, t, s);
 
     {
-      const b0 = tape.get(i - 0.667 * sr);
-      const b1 = bp0(tanh(b0), 1224 + 205 * am(t / 5), 1);
-      tape.set(aux0 + 1.3 * b1, i);
+      // delay
+      const b0 = tape.get(i - 0.67 * sr);
+      const fLfo = lfoBottom * 2 ** (lfoOct * am(t / 5));
+      const b1 = bp0(tanh(b0), fLfo, 1);
+      tape.set(aux0 + 1.35 * b1, i);
       for (let ch = 2; ch--; ) data[ch][i0] += 0.25 * b0;
     }
 
-    synth(data, i0, i, t);
+    monoSynth(data, i0, i, t);
 
     {
       const b0 = 0.53 * revs[0].iGet(i - +8.9e-3 * sr);

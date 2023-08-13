@@ -7,20 +7,19 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 const opt = { id: 0, amp: 1.557 };
 
 const tet = params.tet12 ? 12 : 9;
-const keys = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
-const freq = (n) => 98 * 2 ** (floor(n / 5) + keys.at(mod(n, 5)) / tet);
+const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
+const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 
 const curve = (x) => mix(x, 0.5 + 0.5 * cos(PI + PI * x), 0.3);
 const env = (v, r) => clip(1 - (v % 1) / r);
 const tapes = [0, 1].map(() => new Loop());
+const chords = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
 
 process(opt, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const u = 60 * (curve(phase(t, 20)) + floor(t / 20));
     const arp = ((7 + (floor(u / 120) % 3)) * floor(u)) % 15;
-    const chord = (floor(u / 30) % 2) / tet;
-    const octave = floor(u / 60) % 2;
-    const f = freq(arp) * 2 ** (chord + octave);
+    const f = freq(arp) * chords.at((u / 30) % 4);
     const o = log2(f / 50);
     const p = TAU * f * t;
     const q = TAU * 2 * t;

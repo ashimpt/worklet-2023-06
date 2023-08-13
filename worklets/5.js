@@ -4,7 +4,7 @@ import { Math2, sr, params, process } from "../mod.js";
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 ////////////////////////////////////////////////////////////////////////////////
-const opt = { id: 5, amp: 0.206 };
+const opt = { id: 5, amp: 0.22 };
 const g2 = 98;
 let time = 0;
 
