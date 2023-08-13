@@ -1,5 +1,6 @@
 // prettier-ignore
 const { abs, acos, acosh, asin, asinh, atan, atanh, atan2, ceil, cbrt, expm1, clz32, cos, cosh, exp, floor, fround, hypot, imul, log, log1p, log2, log10, max, min, pow, /*random,*/ round, sign, sin, sinh, sqrt, tan, tanh, trunc, E, LN10, LN2, LOG10E, LOG2E, PI, SQRT1_2, SQRT2 } = Math;
+const { isInteger } = Number;
 const sr = sampleRate;
 
 class XorShift {
@@ -49,11 +50,11 @@ export const Math2 = new (class {
     return array;
   }
   isPrime(v) {
-    // if (!Number.isInteger(v)) throw new Error("isPrime");
+    // if (!isInteger(v)) throw new Error("isPrime");
     if (v < 3) return v == 2;
-    if (Number.isInteger(v / 2)) return false;
+    if (isInteger(v / 2)) return false;
     for (let i = 3, l = sqrt(v); i <= l; i += 2) {
-      if (Number.isInteger(v / i)) return false;
+      if (isInteger(v / i)) return false;
     }
     return true;
   }
@@ -61,13 +62,12 @@ export const Math2 = new (class {
 
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { lerpArray, shuffle } = Math2;
-
 Math2.Loop = class extends Float64Array {
   constructor(sec = 4) {
     super(sec * sr);
   }
   get(idx) {
-    if (!Number.isInteger(idx)) {
+    if (!isInteger(idx)) {
       const im = mod(idx, this.length);
       if (im > this.length - 1) {
         return mix(this.at(-1), this[0], im - floor(im));
