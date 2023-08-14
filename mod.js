@@ -1,6 +1,10 @@
-export { Math2 } from "./math2.js";
+import { createMath2 as getMath2 } from "./math2.js";
 export const sr = sampleRate;
 export const params = {};
+
+export function createMath2() {
+  return getMath2(params.seed);
+}
 
 export function process({ id, amp }, play) {
   let duration, fadeRatio, seekFrameFromStart, trackLength;

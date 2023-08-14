@@ -2,7 +2,8 @@ const { max, min, abs, round, floor, log10, sqrt } = Math;
 import { Math2 } from "./math2.js";
 import { params } from "./mod.js";
 
-const hps = [0, 1].map(() => Math2.Filter.create({ type: "high", f: 20 }));
+const filter = new Math2().Filter;
+const hps = [0, 1].map(() => filter.create({ type: "high", f: 20 }));
 const sr = sampleRate;
 let writer;
 
@@ -68,7 +69,7 @@ class processor extends AudioWorkletProcessor {
     super(...args);
     this.port.onmessage = ({ data }) => {
       Object.assign(params, data);
-      if (data.seed) Math2.setSeed(data.seed);
+      // if (data.seed) Math2.setSeed(data.seed);
 
       this.seekFrame = round(sr * data.seekTime);
       this.length = data.totalDuration * sr;

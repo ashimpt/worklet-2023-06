@@ -1,14 +1,16 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
-import { Math2, sr, params, process } from "../mod.js";
+import { createMath2, sr, params, process } from "../mod.js";
+const Math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 ////////////////////////////////////////////////////////////////////////////////
-const opt = { id: 3, amp: 0.85 };
+const stg = { id: 3, amp: 0.289 };
 const g2 = 98;
 
 const numBirds = 10;
-const birdBagEls = [...Array(40)].map((v, i) => 10 ** -(i % 10));
+const delayTime = 8;
+const birdBagEls = [...Array(20)].map((v, i) => 10 ** -(i % 10));
 const birdBag = Bag.create({ bag: birdBagEls });
 
 class Bird {
@@ -26,47 +28,46 @@ class Bird {
     this.d0 = rnd(0.03, 0.2, 1); // rest
     this.d1 = rnd(0.03, 0.3, 2);
     this.count = 0;
-    this.maxCount = floor(6 / (this.d0 + this.d1));
-    this.a0 = sqrt(1 / numBirds) * birdBag() * 10 ** -rnd(0.5, 0);
-    if (this.a0 < 1e-5) this.a0 = 0;
+    this.maxCount = floor((0.8 * delayTime) / (this.d0 + this.d1));
+    this.a0 = birdBag() * 10 ** -rnd(0.5, 0);
   }
   process(data, i0, i, t) {
-    const { f0, f1, start, d1, e0, a0, a1, pp } = this;
+    const { start, d1 } = this;
     if (t < start) return;
     if (t < start + d1) {
-      if (!a0) return;
+      const { a0, pp } = this;
+      if (a0 < 1e-5) return;
       const p0 = (t - start) / d1;
-      this.p += TAU * mix(f0, f1, p0) * (1 / sr);
+      this.p += TAU * mix(this.f0, this.f1, p0) * (1 / sr);
       const p = this.p;
-      const b = a0 * asd(p0, e0) * sin(p + sin(p));
+      const b = a0 * asd(p0, this.e0) * sin(p + sin(p));
       for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
     } else {
-      this.start = t + this.d0;
       if (rnd(8) < 1 || this.count++ > this.maxCount) this.update();
+      this.start = t + this.d0;
     }
   }
 }
 
 const birds = [...Array(numBirds)].map((v, i) => new Bird(i));
-const tapes = [0, 1].map(() => new Loop(9));
+const tapes = [0, 1].map(() => new Loop(delayTime));
 
-process(opt, function (data, spb, i0, i, t) {
+process(stg, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     for (let b of birds) b.process(data, i0, i, t);
 
     for (let ch = 2; ch--; ) {
-      const fb = tapes[ch].get(i - 8 * sr);
+      const fb = tapes[ch].get(i);
       tapes[ch].set(data[ch][i0] + 0.6 * fb, i);
       data[ch][i0] += 0.6 * fb;
     }
 
-    for (let ch = 2; ch--; ) reverb.inputs[ch] = data[ch][i0];
+    for (let ch = 2; ch--; ) reverb.input(data[ch][i0], i, ch);
     reverb.process(data, i0, i);
   }
 });
 
 const reverb = new (class Reverb {
-  inputs = [0, 0];
   delays = [...Array(14)].map(() => new Loop(1));
   apfLengths = [];
   constructor() {
@@ -80,47 +81,50 @@ const reverb = new (class Reverb {
     while (!Math2.isPrime(v)) v++;
     return v;
   }
+  input(v, i, ch) {
+    this.delays[ch].set(0.07 * v, i);
+  }
   process(data, i0, i) {
-    const { inputs, delays, lpo, lps } = this;
+    const { inputs, delays } = this;
     const srt = sr / 1000;
 
-    for (let ch = 2; ch--; ) delays[ch + 12].set(0.07 * inputs[ch], i);
-
     for (let ch = 2; ch--; ) {
-      let earlyOut = 0;
       const earlyNum = 8;
+      let earlyOut = 0;
       for (let n = 0, c = ch; n < earlyNum; n++) {
         const early = mix(5.777 - ch, 35 + ch, n / earlyNum);
         const a = mix(1, 0.5, n / earlyNum) * (ch == c ? 2 : 1);
-        earlyOut += a * delays[(c++ % 2) + 12].iGet(i - early * srt);
+        earlyOut += a * delays[c++ % 2].iGet(i - early * srt);
       }
       data[ch][i0] += 0.4 * earlyOut;
     }
 
     for (let ch = 2; ch--; ) {
-      const preOut = delays[ch + 12].iGet(i - 5e-3 * srt);
+      const preOut = delays[ch].iGet(i - 5e-3 * srt);
 
-      let combOut = 0;
       const combNum = 4;
+      let combOut = 0;
+      let cIdx = 2 + ch * combNum; // 2 - 9
       for (let n = 0; n < combNum; n++) {
         const dt = mix(31.1 + ch / 3, 39 - ch / 5, n / combNum);
         const a0 = mix(0.8, 0.7, n / combNum);
-        const comb = delays[ch + 2 * n];
+        const comb = delays[cIdx++];
         const b = a0 * comb.iGet(i - dt * srt);
         comb.set(preOut + b, i);
         combOut += b / 4;
       }
 
-      // const apfOut0 = -delays[ch + +8].feedback(combOut, i, 5.0 * srt, 0.7);
-      // const apfOut1 = -delays[ch + 10].feedback(apfOut0, i, 1.7 * srt, 0.7);
+      // let aIdx = 2 + 2 * combNum + 2 * ch; // 10 - 13
+      // const apfOut0 = -delays[aIdx++].feedback(combOut, i, 5.0 * srt, 0.7);
+      // const apfOut1 = -delays[aIdx++].feedback(apfOut0, i, 1.7 * srt, 0.7);
       // data[ch][i0] += apfOut1;
 
-      let apfOut = 0;
       const apfNum = 4;
-      const apf = delays[ch + 8];
+      const apf = delays[2 + 2 * combNum + ch]; // 10, 11
+      let apfOut = 0;
       for (let n = 0; n < apfNum; n++) {
         // const dt = mix(1.555, 10, sqrt(n / apfNum));
-        // apfOut += apf.iGet(i - dt * srt);
+        // apfOut += apf.iGet(i - this.ceilPrime(dt * srt));
         apfOut += apf.iGet(i - this.apfLengths[n]);
       }
       apf.set(combOut + (0.7 / apfNum) * apfOut, i);

@@ -18,36 +18,32 @@ class XorShift {
   }
 }
 
-export const Math2 = new (class {
-  random = Math.random;
-  XorShift = XorShift;
-  setSeed = (seed) => {
-    Math2.random = XorShift.create(seed);
-  };
+class Abstract {
+  constructor(options = {}) {
+    Object.assign(this, options);
+  }
+  static create(options = {}) {
+    const ins = new this();
+    Object.assign(ins, options);
+    return ins.process;
+  }
+}
+
+export class M2 {
   TAU = 2 * Math.PI;
+  clip = (x, lo = 0, hi = 1) => max(lo, min(hi, x));
   mod = (v, m = 1) => ((v % m) + m) % m;
   mix = (a, b = 1, ratio = 0.5) => a + (b - a) * ratio;
-  clip = (x, lo = 0, hi = 1) => max(lo, min(hi, x));
-  phase = (x, l = 1) => mod(x, l) / l;
+  phase = (x, l = 1) => this.mod(x, l) / l;
   crush = (a, b = 0.5, fnc = round) => fnc(a / b) * b;
   pot = (x, k = 1) => x / (1 + (1 - x) * k);
   pan = (x) => x / (0.4 + 0.6 * x);
-  am = (phase) => 0.5 - 0.5 * cos(2 * PI * phase);
+  am = (p) => 0.5 - 0.5 * cos(2 * PI * p);
   asd = (x, a = 0.01, d = 1 - a) => min((x % 1) / a, 1, (1 - (x % 1)) / d);
-  rnd = (lo = 1, hi = 0, e = 1) => lo + (hi - lo) * Math2.random() ** e;
-  rndTriangular = (med = 0.5, r = Math2.random()) =>
-    r < med ? sqrt(r / med) * med : 1 - sqrt((1 - r) / (1 - med)) * (1 - med);
   lerpArray(arr, x) {
     const fx = floor(x);
     const d0 = arr[fx];
     return d0 + (arr[fx + 1] - d0) * (x - fx) || 0;
-  }
-  shuffle(array) {
-    for (let i = 0; i < array.length; i++) {
-      const r = floor(array.length * Math2.random());
-      [array[i], array[r]] = [array[r], array[i]];
-    }
-    return array;
   }
   isPrime(v) {
     // if (!isInteger(v)) throw new Error("isPrime");
@@ -58,11 +54,11 @@ export const Math2 = new (class {
     }
     return true;
   }
-})();
+}
 
-const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
-const { lerpArray, shuffle } = Math2;
-Math2.Loop = class extends Float64Array {
+const { mod, mix, lerpArray } = new M2();
+
+class Loop extends Float64Array {
   constructor(sec = 4) {
     super(sec * sr);
   }
@@ -88,58 +84,24 @@ Math2.Loop = class extends Float64Array {
     const fb = this[mod(parseInt(idx - deltaIdx), this.length)];
     return (this[idx % this.length] = x + amp * fb);
   }
-};
-
-class Abstract {
-  constructor(options = {}) {
-    Object.assign(this, options);
-  }
-  static create(options = {}) {
-    const ins = new this();
-    Object.assign(ins, options);
-    return ins.process;
-  }
 }
 
-Math2.Bag = class extends Abstract {
-  bag = [0, 1];
-  currentBag = [];
-  process = () => {
-    if (!this.currentBag.length)
-      this.currentBag.push(...shuffle([...this.bag]));
-    return this.currentBag.shift();
-  };
-};
-
-Math2.Lop = class extends Abstract {
+class Lop extends Abstract {
   k = exp(-1 / sr);
   y1 = 0;
   process = (inp) => (this.y1 = inp + (this.y1 - inp) * this.k);
-};
+}
 
-Math2.SH = class extends Abstract {
+class SH extends Abstract {
   l = 2;
   x = 0;
   process = (v, i, l = this.l) => {
     if (i % l == 0) this.x = v;
     return this.x;
   };
-};
+}
 
-Math2.Hold = class extends Abstract {
-  k = exp(-7 / sr);
-  l = sr / 10;
-  f = Math2.random;
-  x = 0;
-  y1 = 0;
-  process = (i, fnc) => {
-    if (i % this.l == 0) this.x = fnc ? fnc() : this.f();
-    const { x, y1, k } = this;
-    return (this.y1 = x + (y1 - x) * k);
-  };
-};
-
-const BiquadFilter = class extends Abstract {
+class BiquadFilter extends Abstract {
   x1 = 0;
   x2 = 0;
   y1 = 0;
@@ -181,10 +143,9 @@ const BiquadFilter = class extends Abstract {
     this.a1 = -2 * cos(w0);
     this.a2 = 1 - a;
   };
-};
+}
 
-Math2.BiquadFilter = BiquadFilter;
-Math2.Filter = {
+const Filter = {
   create: ({ type = "low", f = 800, q = 1, u = false } = {}) => {
     if (f > sr / 2) {
       console.warn(f, sr / 2);
@@ -199,3 +160,65 @@ Math2.Filter = {
     else return (x, f0 = f, q0 = q) => (update(f0, q0), process(x));
   },
 };
+
+class Hold extends Abstract {
+  k = exp(-7 / sr);
+  l = sr / 10;
+  f = Math.random;
+  x = 0;
+  y1 = 0;
+  process = (i, fnc = this.f) => {
+    if (i % this.l == 0) this.x = fnc();
+    const { x, y1, k } = this;
+    return (this.y1 = x + (y1 - x) * k);
+  };
+}
+
+class Bag extends Abstract {
+  bag = [0, 1];
+  currentBag = [];
+  // shuffle = () => console.error();
+  process = () => {
+    if (!this.currentBag.length)
+      this.currentBag.push(...this.shuffle([...this.bag]));
+    return this.currentBag.shift();
+  };
+}
+
+export class Math2 extends M2 {
+  XorShift = XorShift;
+  random = Math.random;
+  setSeed = (seed) => (this.random = XorShift.create(seed));
+  rnd = (lo = 1, hi = 0, e = 1) => lo + (hi - lo) * this.random() ** e;
+  rndTriangular = (med = 0.5, r = this.random()) =>
+    r < med ? sqrt(r / med) * med : 1 - sqrt((1 - r) / (1 - med)) * (1 - med);
+  shuffle(array) {
+    for (let i = 0; i < array.length; i++) {
+      const r = floor(array.length * this.random());
+      [array[i], array[r]] = [array[r], array[i]];
+    }
+    return array;
+  }
+  Loop = Loop;
+  Lop = Lop;
+  SH = SH;
+  BiquadFilter = BiquadFilter;
+  Filter = Filter;
+  Hold = Hold;
+  // Bag = Bag;
+}
+
+export function createMath2(seed) {
+  const m2 = new Math2();
+  if (seed) m2.setSeed(seed);
+
+  m2.Hold = class extends Hold {
+    f = m2.random.bind(m2);
+  };
+
+  m2.Bag = class extends Bag {
+    shuffle = m2.shuffle.bind(m2);
+  };
+
+  return m2;
+}

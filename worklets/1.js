@@ -1,10 +1,12 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
-import { Math2, sr, params, process } from "../mod.js";
+import { createMath2, sr, params, process } from "../mod.js";
+const Math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 ////////////////////////////////////////////////////////////////////////////////
-const opt = { id: 1, amp: 0.17 };
+
+const stg = { id: 1, amp: 0.167 };
 const g2 = 98;
 
 class Synth {
@@ -31,9 +33,9 @@ class Synth {
     const vel = [4, 8, 12].at(rnd(3)); // 1e-5 * exp(11.5) = 0.98...
     this.aVel = exp(+vel / sr);
     this.dVel = exp(-vel / sr);
-    const pre = this.overtones;
-    while (pre == this.overtones) this.overtones = [2, 4, 6].at(rnd(3));
-    this.a0 = (1 / this.overtones) ** 0.667;
+    const pre = this.numOsc;
+    while (pre == this.numOsc) this.numOsc = [2, 4, 6].at(rnd(3));
+    this.a0 = (1 / this.numOsc) ** 0.667;
     this.rest = false;
   }
   trigger(i) {
@@ -71,7 +73,7 @@ class Synth {
       const pp0 = this.lop0(this.pp);
       const aL = a1 * pan(1 - pp0);
       const aR = a1 * pan(pp0);
-      for (let n = this.overtones; n--; ) {
+      for (let n = this.numOsc; n--; ) {
         const f = g2 * 2 ** ((note + n) / 9);
         const b = sin(TAU * f * t);
         data[0][i0] += aL * b;
@@ -83,7 +85,7 @@ class Synth {
 
 const synths = [new Synth(0), new Synth(1), new Synth(2)];
 
-process(opt, function (data, spb, i0, i, t) {
+process(stg, function (data, spb, i0, i, t) {
   for (const synth of synths) synth.process(data, i0, i, t, spb);
   reverb(data, spb, i0, i, t);
 });
@@ -93,22 +95,22 @@ const srt = sr / 1000;
 
 function reverb(data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
-    for (let ch = 2; ch--; ) delays[ch + 12].set(0.2 * data[ch][i0], i);
+    for (let ch = 2; ch--; ) delays[ch].set(0.2 * data[ch][i0], i);
     for (let ch = 2; ch--; ) {
-      const preOut = delays[ch + 12].iGet(i - 10e-3 * srt);
+      const preOut = delays[ch].iGet(i - 10e-3 * srt);
 
       let combOut = 0;
       for (let n = 0; n < 4; n++) {
         const dl = mix(55 - ch / 5, 99 + ch / 7, n / 4);
         const a0 = mix(0.8, 0.7, n / 3);
-        const comb = delays[ch + 2 * n];
+        const comb = delays[2 + 2 * n + ch];
         const b = a0 * comb.iGet(i - dl * srt);
         comb.set(preOut + b, i);
         combOut += b / 4;
       }
 
-      const apfOut0 = -delays[ch + +8].feedback(combOut, i, 5.0 * srt, 0.7);
-      const apfOut1 = -delays[ch + 10].feedback(apfOut0, i, 1.7 * srt, 0.7);
+      const apfOut0 = -delays[10 + ch].feedback(combOut, i, 5.0 * srt, 0.7);
+      const apfOut1 = -delays[12 + ch].feedback(apfOut0, i, 1.7 * srt, 0.7);
       data[ch][i0] += apfOut1;
     }
   }

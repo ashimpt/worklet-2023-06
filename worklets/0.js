@@ -1,10 +1,11 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
-import { Math2, sr, params, process } from "../mod.js";
+import { createMath2, sr, params, process } from "../mod.js";
+const Math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 ////////////////////////////////////////////////////////////////////////////////
-const opt = { id: 0, amp: 1.557 };
+const stg = { id: 0, amp: 1.557 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
@@ -15,7 +16,7 @@ const env = (v, r) => clip(1 - (v % 1) / r);
 const tapes = [0, 1].map(() => new Loop());
 const chords = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
 
-process(opt, function (data, spb, i0, i, t) {
+process(stg, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const u = 60 * (curve(phase(t, 20)) + floor(t / 20));
     const arp = ((7 + (floor(u / 120) % 3)) * floor(u)) % 15;

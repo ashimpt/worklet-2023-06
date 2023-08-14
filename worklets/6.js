@@ -1,10 +1,11 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
-import { Math2, sr, params, process } from "../mod.js";
+import { createMath2, sr, params, process } from "../mod.js";
+const Math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 ////////////////////////////////////////////////////////////////////////////////
-const opt = { id: 6, amp: 0.435 };
+const stg = { id: 6, amp: 0.429 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
@@ -16,22 +17,22 @@ class Synth {
   constructor(id) {
     this.o = [2, 1, 0, 0, 1, 2].at(id);
     this.v = [4, 2, 1, 1, 2, 4].at(id);
-    this.pat = rnd(2 ** 8);
+    this.pattern = rnd(2 ** 8);
     this.pp = id / 5;
   }
   n = -1;
   process(data, i0, i, t, speed) {
-    const { bass, o, v, pp } = this;
-    if (i % (32 * sr) == 0) this.pat = rnd(2 ** 8);
-    const n = v * (t + 0.7 * speed);
+    if (i % (32 * sr) == 0) this.pattern = rnd(2 ** 8);
+    const n = this.v * (t + 0.7 * speed);
     if (this.n != floor(n)) {
       this.n = floor(n);
-      const pattern = 0b11 & (this.pat >> (2 * floor(n % 4)));
-      const n0 = 5 * o + bass.at((n / 16) % 2) + pattern;
+      const pat = 0b11 & (this.pattern >> (2 * floor(n % 4)));
+      const n0 = 5 * this.o + this.bass.at((n / 16) % 2) + pat;
       this.f = freq(n0);
       this.a = 0.5 * min(1, 8 / (n0 + 5));
     }
-    
+
+    const { pp } = this;
     const p = TAU * this.f * t;
     const p0 = n % 1;
     const e0 = min(p0 / 1e-3, (1 - p0) ** 2);
@@ -46,7 +47,7 @@ const synths = [0, 1, 2, 3, 4, 5].map((v) => new Synth(v));
 
 const aux0 = [0, 0];
 
-process(opt, function (data, spb, i0, i, t) {
+process(stg, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const speed = am(t / 32);
     for (const s of synths) s.process(data, i0, i, t, speed);
@@ -56,7 +57,7 @@ process(opt, function (data, spb, i0, i, t) {
     aux0[0] = aux0[1] = 0;
     createBackground(data, spb, i0, i, t);
 
-    for (let ch = 2; ch--; ) reverb.inputs[ch] = aux0[ch] + 0.1 * data[ch][i0];
+    for (let ch = 2; ch--; ) reverb.input(aux0[ch] + 0.1 * data[ch][i0], i, ch);
     reverb.process(data, i0, i);
 
     for (let ch = 2; ch--; ) data[ch][i0] += 2 * aux0[ch];
@@ -94,37 +95,37 @@ function createBackground(data, spb, i0, i, t) {
 }
 
 const reverb = new (class Reverb {
-  inputs = [0, 0];
   delays = [...Array(14)].map(() => new Loop(1));
+  input(v, i, ch) {
+    this.delays[ch].set(0.5 * v, i);
+  }
   process(data, i0, i) {
     const { inputs, delays } = this;
     const srt = sr / 1000;
-
-    for (let ch = 2; ch--; ) delays[ch + 12].set(0.5 * inputs[ch], i);
 
     for (let ch = 2; ch--; ) {
       let earlyOut = 0;
       for (let n = 0, num = 8; n < num; n++) {
         const early = mix(5.777 - ch, 9 + ch, n / num);
         const a = 0.9 * mix(1, 0.5, n / num) * (n % 2 ? 1 : 2);
-        earlyOut += a * delays[((ch + n) % 2) + 12].iGet(i - early * srt);
+        earlyOut += a * delays[(ch + n) % 2].iGet(i - early * srt);
       }
 
       // data[ch][i0] += earlyOut;
-      // const preOut = delays[ch + 12].iGet(i - 5e-3 * srt);
+      // const preOut = delays[ch].iGet(i - 5e-3 * srt);
 
       let combOut = 0;
       for (let n = 0, num = 4; n < num; n++) {
         const dl = mix(33.444 + ch, 55 - ch, n / num);
         const a0 = mix(0.9, 0.8, n / (num - 1));
-        const comb = delays[ch + 2 * n];
+        const comb = delays[2 + 2 * n + ch];
         const b = a0 * comb.iGet(i - dl * srt);
         comb.set(earlyOut + b, i);
         combOut += b / num;
       }
 
-      const apfOut0 = -delays[ch + +8].feedback(combOut, i, 5.0 * srt, 0.7);
-      const apfOut1 = -delays[ch + 10].feedback(apfOut0, i, 1.7 * srt, 0.7);
+      const apfOut0 = -delays[10 + ch].feedback(combOut, i, 5.0 * srt, 0.7);
+      const apfOut1 = -delays[12 + ch].feedback(apfOut0, i, 1.7 * srt, 0.7);
       data[ch][i0] += apfOut1;
     }
   }

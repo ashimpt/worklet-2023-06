@@ -1,10 +1,11 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
-import { Math2, sr, params, process } from "../mod.js";
+import { createMath2, sr, params, process } from "../mod.js";
+const Math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
 ////////////////////////////////////////////////////////////////////////////////
-const opt = { id: 4, amp: 0.135 };
+const stg = { id: 4, amp: 0.143 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
@@ -33,12 +34,12 @@ const l1 = lPhrase / div;
 function updateNote(i, t, s) {
   if (i % lPhrase == 0) t0 = 0.07 * crush(t, 4 * durPhrase, floor);
   f = freq(5 + 18 * melody(rndMelody + t0 + 0.0715 * (t % durPhrase)));
-  if (phase(t, 4 * durPhrase) >= 0.5) f *= 2 ** shift;
   a0 = min(1, 2 / log2(f / 100));
+  if (phase(t, 4 * durPhrase) >= 0.5) f *= 2 ** shift;
 }
 updateNote(0, 0, 0);
 
-process(opt, function (data, spb, i0, i, t) {
+process(stg, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     if (i % l0 == 0) {
       const s = div * phase(i, lPhrase);
