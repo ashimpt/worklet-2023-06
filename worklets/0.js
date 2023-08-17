@@ -1,11 +1,11 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
 import { createMath2, sr, params, process } from "../mod.js";
-const Math2 = createMath2();
-const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
-const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
+const math2 = createMath2();
+const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
+const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 0, amp: 1.557 };
+const stg = { id: 0, amp: 2.421 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
@@ -14,13 +14,13 @@ const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 const curve = (x) => mix(x, 0.5 + 0.5 * cos(PI + PI * x), 0.3);
 const env = (v, r) => clip(1 - (v % 1) / r);
 const tapes = [0, 1].map(() => new Loop());
-const chords = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
+const shifts = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
 
 process(stg, function (data, spb, i0, i, t) {
   for (; i0 < spb; i0++, t = ++i / sr) {
     const u = 60 * (curve(phase(t, 20)) + floor(t / 20));
     const arp = ((7 + (floor(u / 120) % 3)) * floor(u)) % 15;
-    const f = freq(arp) * chords.at((u / 30) % 4);
+    const f = freq(arp) * shifts.at((u / 30) % 4);
     const o = log2(f / 50);
     const p = TAU * f * t;
     const q = TAU * 2 * t;

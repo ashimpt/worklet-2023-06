@@ -1,3 +1,4 @@
+const { min, max } = Math;
 import { createMath2 as getMath2 } from "./math2.js";
 export const sr = sampleRate;
 export const params = {};
@@ -31,20 +32,15 @@ export function process({ id, amp }, play) {
       const i0 = i < 0 ? -i : 0;
       i = i < 0 ? 0 : i;
       play(data, samplesPerBlock, i0, i, i / sr);
-      fade(data, i, samplesPerBlock, fadeRatio, duration, amp);
+      // fade
+      for (let i0 = 0; i0 < samplesPerBlock; i0++, i++) {
+        const p = min(1, max(0, i / sr / duration));
+        const a = amp * min(p / fadeRatio, 1, (1 - p) / fadeRatio) ** 0.7;
+        for (let ch = 2; ch--; ) data[ch][i0] *= a;
+      }
       return true;
     }
   }
 
   registerProcessor(id, processor);
-}
-
-const { min, max } = Math;
-
-function fade(data, i, spb, ratio, duration, amp = 1) {
-  for (let i0 = 0; i0 < spb; i0++, i++) {
-    const p = min(1, max(0, i / sr / duration));
-    const a = amp * min(p / ratio, 1, (1 - p) / ratio) ** 0.7;
-    for (let ch = 2; ch--; ) data[ch][i0] *= a;
-  }
 }

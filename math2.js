@@ -46,7 +46,6 @@ export class M2 {
     return d0 + (arr[fx + 1] - d0) * (x - fx) || 0;
   }
   isPrime(v) {
-    // if (!isInteger(v)) throw new Error("isPrime");
     if (v < 3) return v == 2;
     if (isInteger(v / 2)) return false;
     for (let i = 3, l = sqrt(v); i <= l; i += 2) {
@@ -54,9 +53,22 @@ export class M2 {
     }
     return true;
   }
+
+  random = Math.random;
+  setSeed = (seed) => (this.random = XorShift.create(seed));
+  rnd = (lo = 1, hi = 0, e = 1) => lo + (hi - lo) * this.random() ** e;
+  rndTriangular = (med = 0.5, r = this.random()) =>
+    r < med ? sqrt(r / med) * med : 1 - sqrt((1 - r) / (1 - med)) * (1 - med);
+  shuffle(array) {
+    for (let i = 0; i < array.length; i++) {
+      const r = floor(array.length * this.random());
+      [array[i], array[r]] = [array[r], array[i]];
+    }
+    return array;
+  }
 }
 
-const { mod, mix, lerpArray } = new M2();
+const { mod, mix, lerpArray, shuffle } = new M2();
 
 class Loop extends Float64Array {
   constructor(sec = 4) {
@@ -177,7 +189,8 @@ class Hold extends Abstract {
 class Bag extends Abstract {
   bag = [0, 1];
   currentBag = [];
-  // shuffle = () => console.error();
+  random = Math.random;
+  shuffle = shuffle;
   process = () => {
     if (!this.currentBag.length)
       this.currentBag.push(...this.shuffle([...this.bag]));
@@ -187,37 +200,27 @@ class Bag extends Abstract {
 
 export class Math2 extends M2 {
   XorShift = XorShift;
-  random = Math.random;
-  setSeed = (seed) => (this.random = XorShift.create(seed));
-  rnd = (lo = 1, hi = 0, e = 1) => lo + (hi - lo) * this.random() ** e;
-  rndTriangular = (med = 0.5, r = this.random()) =>
-    r < med ? sqrt(r / med) * med : 1 - sqrt((1 - r) / (1 - med)) * (1 - med);
-  shuffle(array) {
-    for (let i = 0; i < array.length; i++) {
-      const r = floor(array.length * this.random());
-      [array[i], array[r]] = [array[r], array[i]];
-    }
-    return array;
-  }
   Loop = Loop;
   Lop = Lop;
   SH = SH;
   BiquadFilter = BiquadFilter;
   Filter = Filter;
   Hold = Hold;
-  // Bag = Bag;
+  Bag = Bag;
 }
 
 export function createMath2(seed) {
   const m2 = new Math2();
-  if (seed) m2.setSeed(seed);
+  if (!seed) return m2;
+
+  m2.setSeed(seed);
 
   m2.Hold = class extends Hold {
-    f = m2.random.bind(m2);
+    f = m2.random;
   };
 
   m2.Bag = class extends Bag {
-    shuffle = m2.shuffle.bind(m2);
+    random = m2.random;
   };
 
   return m2;

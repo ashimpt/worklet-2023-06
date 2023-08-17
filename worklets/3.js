@@ -1,11 +1,11 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
 import { createMath2, sr, params, process } from "../mod.js";
-const Math2 = createMath2();
-const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
-const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
+const math2 = createMath2();
+const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
+const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 3, amp: 0.289 };
+const stg = { id: 3, amp: 0.454 };
 const g2 = 98;
 
 const numBirds = 10;
@@ -22,8 +22,8 @@ class Bird {
     this.update();
   }
   update() {
-    this.f0 = mix(g2, g2 * 2 ** 4, Math2.rndTriangular(0.4));
-    this.f1 = mix(g2, g2 * 2 ** 4, Math2.rndTriangular(0.2));
+    this.f0 = mix(g2, g2 * 2 ** 4, math2.rndTriangular(0.4));
+    this.f1 = mix(g2, g2 * 2 ** 4, math2.rndTriangular(0.2));
     this.e0 = rnd(0.1, 0.9);
     this.d0 = rnd(0.03, 0.2, 1); // rest
     this.d1 = rnd(0.03, 0.3, 2);
@@ -78,7 +78,7 @@ const reverb = new (class Reverb {
   }
   ceilPrime(v) {
     v = ceil(v);
-    while (!Math2.isPrime(v)) v++;
+    while (!math2.isPrime(v)) v++;
     return v;
   }
   input(v, i, ch) {

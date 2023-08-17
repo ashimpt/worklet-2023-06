@@ -1,11 +1,11 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
 import { createMath2, sr, params, process } from "../mod.js";
-const Math2 = createMath2();
-const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
-const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
+const math2 = createMath2();
+const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
+const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 5, amp: 0.224 };
+const stg = { id: 5, amp: 0.349 };
 const g2 = 98;
 let time = 0;
 
@@ -18,7 +18,7 @@ const rndToggle = Hold.create({ k: exp(-99 / sr), l: sr / 1, f: rndTg });
 
 const tapes = [0, 1].map(() => new Loop(4));
 const bag = Bag.create({ bag: [-2, -1, 1, 2] });
-const lps = [0, 1].map(() => Filter.create({ f: 10e3 }));
+const lps = [0, 1].map(() => Filter.create({ f: sr / 2 }));
 const lop0 = Lop.create({ k: exp(-333 / sr) });
 
 let oct = 0;

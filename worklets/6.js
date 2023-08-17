@@ -1,11 +1,11 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
 import { createMath2, sr, params, process } from "../mod.js";
-const Math2 = createMath2();
-const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
-const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
+const math2 = createMath2();
+const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
+const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 6, amp: 0.429 };
+const stg = { id: 6, amp: 0.668 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];

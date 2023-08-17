@@ -31,7 +31,7 @@ const peakMeter = {
   value: 0,
   peak: 0,
   peaks: [0, 0],
-  sumSq: [1e-3, 1e-3],
+  sumSq: [0.01, 0.01],
   process(inp, spb) {
     const { peaks, sumSq } = this;
     let blockPeak = 0;

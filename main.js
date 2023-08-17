@@ -11,11 +11,12 @@ addEventListener("load", () => {
   params.interval = params.fade + params.solo;
   params.totalDuration = (num - 1) * params.interval + params.duration;
 
+  if (!params.anlz) q("canvas").style.display = "none";
   q("#info").textContent = `sampleRate: ${params.sr}`;
 
   const cw = q("canvas").offsetWidth;
   q("canvas").width = cw;
-  q("canvas").height = parseInt(cw / 4);
+  q("canvas").height = parseInt(cw / 5);
 
   q("#output").append(createSeekBar());
   q("#output").append(createButton("play", () => start()));
@@ -99,12 +100,17 @@ async function setupMasterMessage(master, seekTime) {
     master.port.onmessage = rsl;
   });
 
+  const zero = (num) => (num < 10 ? "0" + num : num);
   const pcm = { amplifier: 1, data: [] };
+
   master.port.onmessage = ({ data }) => {
     if (data.info) {
-      const s = JSON.stringify(data.info || {}).replace(/[\"{}]/g, "");
-      q("#info").textContent = s; // volume info
-      q("#seekbar").change(data.info.t);
+      const info = data.info;
+      q("#seekbar").change(info.t);
+
+      info.time = zero(parseInt(info.t / 60)) + ":" + zero(info.t % 60);
+      info.t = undefined;
+      q("#info").textContent = JSON.stringify(info).replace(/[\"{}]/g, "");
     }
     if (data.amplifier) pcm.amplifier = data.amplifier;
     if (data.buffer) {

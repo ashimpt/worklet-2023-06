@@ -1,19 +1,20 @@
 // prettier-ignore
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
 import { createMath2, sr, params, process } from "../mod.js";
-const Math2 = createMath2();
-const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = Math2;
-const { Loop, Bag, Lop, Filter, SH, Hold } = Math2;
+const math2 = createMath2();
+const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
+const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 2, amp: 0.224 };
+const stg = { id: 2, amp: 0.385 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
 const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 
 const rndMel = rnd();
+let octave = 0;
 const mel1 = (t) => round(7 * am(3 * t + 0.5 * am(5 * t)) + 3 * am(t));
-const mel0 = (t) => mel1(25e-3 * t + rndMel) + 5 * (floor(t / 20) % 2);
+const mel0 = (t) => mel1(25e-3 * t + rndMel) + 5 * octave;
 
 const fncFltr = (o) => o.i < o.l;
 let list = [];
@@ -83,6 +84,7 @@ process(stg, function (data, spb, i0, i, t) {
   f0 = 2 * freq(mel0(t));
 
   for (; i0 < spb; i0++, t = ++i / sr) {
+    if (i % (5 * sr) == 0 && rnd(2) < 1) octave ^= 1;
     if (i % (sr / 4) == 0) {
       list = list.filter(fncFltr);
       if (list.length < 5 && t % 10 < 7) list.push(createNote(t));
