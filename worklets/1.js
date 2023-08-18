@@ -6,13 +6,14 @@ const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
 
-const stg = { id: 1, amp: 0.263 };
+const stg = { id: 1, amp: 0.194 };
 const g2 = 98;
 
 class Synth {
   env = 1e-5;
   pp = 0.5;
   end = 0;
+  rest = 1;
   lop0 = Lop.create({ k: exp(-35 / sr) });
   constructor(id) {
     const opt = [
@@ -23,8 +24,6 @@ class Synth {
     Object.assign(this, opt);
 
     this.denominatorBag = Bag.create({ bag: opt.denominators });
-
-    this.rest = 1;
   }
   update() {
     this.denominator = this.denominatorBag();

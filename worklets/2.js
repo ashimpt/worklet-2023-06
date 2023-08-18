@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 2, amp: 0.385 };
+const stg = { id: 2, amp: 0.426 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
@@ -20,26 +20,33 @@ const fncFltr = (o) => o.i < o.l;
 let list = [];
 let count = 0;
 
-function createNote(t) {
-  const pp = (count++ % 5) / 4;
+function createNote(t, beat) {
+  const mainBeat = [0, 3].includes(beat % 4);
+  if (list.length > 5 && !mainBeat) return;
+
   const n = mel0(t);
   const f = freq(n);
-  const rNum = list.filter((o) => o.r).length;
-  const rFrq = list.find((o) => o.r && o.f == f);
-  const long = rnd(4) < 1 && rNum < 3 && !rFrq;
+  const repFrq = list.filter((o) => o.f == f).length >= 2;
+  if (repFrq && !mainBeat) return;
+
+  const pp = (count++ % 5) / 4;
+  const o = log2(f / 50);
+
+  const longNum = list.filter((o) => o.long).length < 3;
+  const longFrq = list.find((o) => o.long && o.f == f) === undefined;
+  const long = longNum && longFrq && !mainBeat && rnd(4) < 1;
+
   const l = (long ? 6 : 2) * sr;
   const fm = long ? freq(n + 6) / f - 1 : 3;
-  const o = log2(f / 50);
-  return { i: 0, n, f, o, pp, long, l, fm };
+  list.push({ i: 0, n, f, o, pp, long, l, fm });
 }
 
 const env = (t, dr) => max(0, 1 - t / dr);
-const tape = new Loop();
-const bp0 = Filter.create({ type: "band", u: 1 });
 let aux0 = 0;
 
 function synth(data, i0, t, s) {
   const { i, l, long, o, f, fm, pp } = s;
+  if (i > l) return;
   const t0 = i / sr;
   const p0 = i / l;
   const p = TAU * f * t0;
@@ -53,10 +60,10 @@ function synth(data, i0, t, s) {
     const b0a = 2 * env(t0, 0.02) * sin(3 * p);
     const b0 = (5 / o) * env(t0, 0.1) * sin(2 * p + b0a);
     const b1 = (200 / f) * env(t0, 0.2 / o) * sin(5 * p);
-    const a1 = f < 201 ? 0 : (3 / o) * (t0 / t0 ** t0);
-    const b2 = f < 201 ? 0 : a1 * mix(sin(3 * p), sin(3.015 * p));
+    const a2 = f < 201 ? 0 : (3 / o) * (t0 / t0 ** t0);
+    const b2 = f < 201 ? 0 : a2 * mix(sin(3 * p), sin(3.015 * p));
     const e0 = asd(p0, 0.01);
-    b *= 1.0 * e0 * sin(p + b0 + b1 + b2);
+    b *= 0.9 * e0 * sin(p + b0 + b1 + b2);
     aux0 += b;
   }
   for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
@@ -75,28 +82,36 @@ function monoSynth(data, i0, i, t) {
   for (let ch = 2; ch--; ) data[ch][i0] += 0.12 * b0;
 }
 
-const revs = [0, 1].map(() => new Loop());
+const tape = new Loop();
+const bp0 = Filter.create({ type: "band", u: 1 });
 const lfoBottom = freq(18) + 50;
 const lfoTop = freq(19) - 50;
 const lfoOct = log2(lfoTop / lfoBottom);
+
+const revs = [0, 1].map(() => new Loop());
+
+const bpm = 55 * 4;
+let beat = -1;
 
 process(stg, function (data, spb, i0, i, t) {
   f0 = 2 * freq(mel0(t));
 
   for (; i0 < spb; i0++, t = ++i / sr) {
-    if (i % (5 * sr) == 0 && rnd(2) < 1) octave ^= 1;
-    if (i % (sr / 4) == 0) {
+    const currentBeat = (bpm / 60) * t;
+    if (beat != floor(currentBeat)) {
+      beat = floor(currentBeat);
+
+      if (beat % 20 == 0 && rnd(2) < 1) octave ^= 1;
       list = list.filter(fncFltr);
-      if (list.length < 5 && t % 10 < 7) list.push(createNote(t));
+      if (beat % 8 < 4 && beat % 40 < 24) createNote(t, beat);
     }
 
     aux0 = 0;
     for (const s of list) synth(data, i0, t, s);
 
-    {
-      // delay
-      const b0 = tape.get(i - 0.67 * sr);
-      const fLfo = lfoBottom * 2 ** (lfoOct * am(t / 5));
+    delay: {
+      const b0 = tape.get(i - 0.7 * sr);
+      const fLfo = lfoBottom * 2 ** (lfoOct * am(t / 4));
       const b1 = bp0(tanh(b0), fLfo, 1);
       tape.set(aux0 + 1.35 * b1, i);
       for (let ch = 2; ch--; ) data[ch][i0] += 0.25 * b0;
@@ -104,7 +119,7 @@ process(stg, function (data, spb, i0, i, t) {
 
     monoSynth(data, i0, i, t);
 
-    {
+    reverb: {
       const b0 = 0.53 * revs[0].iGet(i - +8.9e-3 * sr);
       const b1 = 0.41 * revs[1].iGet(i - 40.1e-3 * sr);
       const b2 = 0.53 * revs[1].iGet(i - +8.3e-3 * sr);

@@ -12,7 +12,7 @@ const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
 const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 
 const curve = (x) => mix(x, 0.5 + 0.5 * cos(PI + PI * x), 0.3);
-const env = (v, r) => clip(1 - (v % 1) / r);
+const decay = (v, r) => clip(1 - (v % 1) / r);
 const tapes = [0, 1].map(() => new Loop());
 const shifts = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
 
@@ -27,8 +27,8 @@ process(stg, function (data, spb, i0, i, t) {
     const df = 2.5 + o / 5;
     const b0 = asd(u, 0.33, 0.33) * mix(sin((f + df) * q), sin((f - df) * q));
     const b3a = o < 3 ? 0.7 * sin(800 * q) : 0;
-    const b3 = 0.3 * env(u, 0.05) * (sin(4 * p) + b3a);
-    const b2 = (2 / o) * env(u, 1) * sin(E * p + b3);
+    const b3 = 0.3 * decay(u, 0.05) * (sin(4 * p) + b3a);
+    const b2 = (2 / o) * decay(u, 1) * sin(E * p + b3);
     const b1 = asd(u) * sin(p + b2 - 0.5 * am(t / 11) * b0);
     const b = min(1, 2 / o) * (0.2 * b1 + 0.07 * b0);
     const pp = 0.5 + (-1) ** arp * mix(0, 0.25, arp / 14);

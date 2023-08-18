@@ -5,12 +5,11 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 6, amp: 0.668 };
+const stg = { id: 6, amp: 0.66 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
 const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
-const bank = {};
 
 class Synth {
   bass = [3, -1];
@@ -20,21 +19,21 @@ class Synth {
     this.pattern = rnd(2 ** 8);
     this.pp = id / 5;
   }
-  n = -1;
+  beat = -1;
   process(data, i0, i, t, speed) {
     if (i % (32 * sr) == 0) this.pattern = rnd(2 ** 8);
-    const n = this.v * (t + 0.7 * speed);
-    if (this.n != floor(n)) {
-      this.n = floor(n);
-      const pat = 0b11 & (this.pattern >> (2 * floor(n % 4)));
-      const n0 = 5 * this.o + this.bass.at((n / 16) % 2) + pat;
+    const beat = this.v * (t + 0.7 * speed);
+    if (this.beat != floor(beat)) {
+      this.beat = floor(beat);
+      const n1 = 0b11 & (this.pattern >> (2 * floor(beat % 4)));
+      const n0 = 5 * this.o + this.bass.at((beat / 16) % 2) + n1;
       this.f = freq(n0);
       this.a = 0.5 * min(1, 8 / (n0 + 5));
     }
 
     const { pp } = this;
     const p = TAU * this.f * t;
-    const p0 = n % 1;
+    const p0 = beat % 1;
     const e0 = min(p0 / 1e-3, (1 - p0) ** 2);
     const b1 = 0.7 * (1 - p0) ** 7 * sin(p / E);
     const b0 = 1.1 * (1 - p0) ** 5 * sin(E * p + b1);
