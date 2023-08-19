@@ -5,8 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-
-const stg = { id: 1, amp: 0.194 };
+const stg = { id: 1, amp: 0.209 };
 const g2 = 98;
 
 class Synth {
@@ -17,19 +16,24 @@ class Synth {
   lop0 = Lop.create({ k: exp(-35 / sr) });
   constructor(id) {
     const opt = [
-      { bottom: 18, maxNumerator: 8, denominators: [32, 16, 12, 8] },
-      { bottom: +9, maxNumerator: 4, denominators: [16, +6, +4, 2] },
-      { bottom: +0, maxNumerator: 2, denominators: [+8, +3, +2, 1] },
+      { lowest: 18, maxNumerator: 8, denominators: [32, 16, 12, 8] },
+      { lowest: +9, maxNumerator: 4, denominators: [16, +6, +4, 2] },
+      { lowest: +0, maxNumerator: 2, denominators: [+8, +3, +2, 1] },
     ].at(id);
     Object.assign(this, opt);
 
+    const idxBag = (l, s = 0) => ({ bag: [...Array(l)].map((v, i) => i + s) });
+    this.noteBag = Bag.create(idxBag(27, opt.lowest));
+    this.numeratorBag = Bag.create(idxBag(opt.maxNumerator, 1));
     this.denominatorBag = Bag.create({ bag: opt.denominators });
+    this.velBag = Bag.create({ bag: [4, 8, 12] });
+    this.panBag = Bag.create({ bag: [...Array(9)].map((v, i) => i / 8) });
   }
   update() {
     this.denominator = this.denominatorBag();
-    this.count = 0;
-    this.updateCount = clip(ceil(rnd(3) * this.denominator), 4, 32);
-    const vel = [4, 8, 12].at(rnd(3)); // 1e-5 * exp(11.5) = 0.98...
+    this.noteCount = 0;
+    this.stopCount = clip(ceil(rnd(3) * this.denominator), 4, 32);
+    const vel = this.velBag(); // 1e-5 * exp(11.5) = 0.98...
     this.aVel = exp(+vel / sr);
     this.dVel = exp(-vel / sr);
     const pre = this.numOsc;
@@ -40,20 +44,19 @@ class Synth {
   trigger(i) {
     if (this.rest) this.update();
 
-    const pre = this.note;
-    while (pre == this.note) this.note = this.bottom + floor(rnd(27));
-    this.pp = rnd();
+    this.note = this.noteBag();
+    this.pp = this.panBag();
     this.dir = 1;
     this.start = i;
-    const dr = ceil(rnd(this.maxNumerator)) / this.denominator;
+    const dr = this.numeratorBag() / this.denominatorBag();
     this.end = i + round(dr * sr);
 
-    if (this.count == this.updateCount) {
+    if (this.noteCount == this.stopCount) {
       this.end = crush(this.end + rnd(1, 4) * sr, sr / 2);
       this.rest = true;
     }
 
-    this.count++;
+    this.noteCount++;
   }
   process(data, i0, i, t, spb) {
     for (; i0 < spb; i0++, t = ++i / sr) {

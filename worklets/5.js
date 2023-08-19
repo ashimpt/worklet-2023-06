@@ -17,10 +17,6 @@ const rndTg = () => (rnd(9 - 6 * am(time / 180)) < 1 ? 1 : 0);
 const rndToggle = Hold.create({ k: exp(-99 / sr), l: sr / 1, f: rndTg });
 const lop1 = Lop.create({ k: exp(-333 / sr) });
 
-const tapes = [0, 1].map(() => new Loop(4));
-const bag = Bag.create({ bag: [-2, -1, 1, 2] });
-const lps = [0, 1].map(() => Filter.create({ f: sr / 2 }));
-
 let oct = 0;
 let p1 = 0;
 let fMod;
@@ -68,3 +64,7 @@ process(stg, function (data, spb, i0, i, t) {
       data[ch][i] = lps[ch](data[ch][i]);
     }
 });
+
+const tapes = [0, 1].map(() => new Loop(4));
+const bag = Bag.create({ bag: [-2, -1, 1, 2] });
+const lps = [0, 1].map(() => Filter.create({ f: sr / 2 }));

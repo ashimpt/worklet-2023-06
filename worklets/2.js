@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 2, amp: 0.426 };
+const stg = { id: 2, amp: 0.412 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
@@ -16,7 +16,6 @@ let octave = 0;
 const mel1 = (t) => round(7 * am(3 * t + 0.5 * am(5 * t)) + 3 * am(t));
 const mel0 = (t) => mel1(25e-3 * t + rndMel) + 5 * octave;
 
-const fncFltr = (o) => o.i < o.l;
 let list = [];
 let count = 0;
 
@@ -41,7 +40,7 @@ function createNote(t, beat) {
   list.push({ i: 0, n, f, o, pp, long, l, fm });
 }
 
-const env = (t, dr) => max(0, 1 - t / dr);
+const decay = (t, dr) => max(0, 1 - t / dr);
 let aux0 = 0;
 
 function synth(data, i0, t, s) {
@@ -57,9 +56,9 @@ function synth(data, i0, t, s) {
     const e0 = 0.4 * asd(p0, 1e-3, 1e-3);
     b *= 0.7 * e0 * sin(p + b1);
   } else {
-    const b0a = 2 * env(t0, 0.02) * sin(3 * p);
-    const b0 = (5 / o) * env(t0, 0.1) * sin(2 * p + b0a);
-    const b1 = (200 / f) * env(t0, 0.2 / o) * sin(5 * p);
+    const b0a = 2 * decay(t0, 0.02) * sin(3 * p);
+    const b0 = (5 / o) * decay(t0, 0.1) * sin(2 * p + b0a);
+    const b1 = (200 / f) * decay(t0, 0.2 / o) * sin(5 * p);
     const a2 = f < 201 ? 0 : (3 / o) * (t0 / t0 ** t0);
     const b2 = f < 201 ? 0 : a2 * mix(sin(3 * p), sin(3.015 * p));
     const e0 = asd(p0, 0.01);
@@ -82,27 +81,19 @@ function monoSynth(data, i0, i, t) {
   for (let ch = 2; ch--; ) data[ch][i0] += 0.12 * b0;
 }
 
-const tape = new Loop();
-const bp0 = Filter.create({ type: "band", u: 1 });
-const lfoBottom = freq(18) + 50;
-const lfoTop = freq(19) - 50;
-const lfoOct = log2(lfoTop / lfoBottom);
-
-const revs = [0, 1].map(() => new Loop());
-
-const bpm = 55 * 4;
+const bpm = 110;
 let beat = -1;
 
 process(stg, function (data, spb, i0, i, t) {
   f0 = 2 * freq(mel0(t));
 
   for (; i0 < spb; i0++, t = ++i / sr) {
-    const currentBeat = (bpm / 60) * t;
+    const currentBeat = ((bpm * 2) / 60) * t;
     if (beat != floor(currentBeat)) {
       beat = floor(currentBeat);
 
       if (beat % 20 == 0 && rnd(2) < 1) octave ^= 1;
-      list = list.filter(fncFltr);
+      list = list.filter((o) => o.i < o.l);
       if (beat % 8 < 4 && beat % 40 < 24) createNote(t, beat);
     }
 
@@ -113,7 +104,7 @@ process(stg, function (data, spb, i0, i, t) {
       const b0 = tape.get(i - 0.7 * sr);
       const fLfo = lfoBottom * 2 ** (lfoOct * am(t / 4));
       const b1 = bp0(tanh(b0), fLfo, 1);
-      tape.set(aux0 + 1.35 * b1, i);
+      tape.set(aux0 + 1.33 * b1, i);
       for (let ch = 2; ch--; ) data[ch][i0] += 0.25 * b0;
     }
 
@@ -131,3 +122,11 @@ process(stg, function (data, spb, i0, i, t) {
     }
   }
 });
+
+const tape = new Loop();
+const bp0 = Filter.create({ type: "band", u: 1 });
+const lfoBottom = freq(18) + 50;
+const lfoTop = freq(19) - 50;
+const lfoOct = log2(lfoTop / lfoBottom);
+
+const revs = [0, 1].map(() => new Loop());

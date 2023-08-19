@@ -12,7 +12,7 @@ const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
 const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 
 const curve = (x) => mix(x, 0.5 + 0.5 * cos(PI + PI * x), 0.3);
-const decay = (v, r) => clip(1 - (v % 1) / r);
+const decay = (p, dr) => clip(1 - (p % 1) / dr);
 const tapes = [0, 1].map(() => new Loop());
 const shifts = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
 
