@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 2, amp: 0.412 };
+const stg = { id: 2, amp: 0.371 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
@@ -84,10 +84,10 @@ function monoSynth(data, i0, i, t) {
 const bpm = 110;
 let beat = -1;
 
-process(stg, function (data, spb, i0, i, t) {
+process(stg, function (data, length, i0, i, t) {
   f0 = 2 * freq(mel0(t));
 
-  for (; i0 < spb; i0++, t = ++i / sr) {
+  for (; i0 < length; i0++, t = ++i / sr) {
     const currentBeat = ((bpm * 2) / 60) * t;
     if (beat != floor(currentBeat)) {
       beat = floor(currentBeat);

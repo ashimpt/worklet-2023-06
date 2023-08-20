@@ -19,7 +19,7 @@ const lp = Filter.create({ u: 1 });
 const useFilter = sr / 2 > 8000;
 const sh = SH.create({ l: round(sr / freq(18)) });
 
-let f, a0, length;
+let f, a0, lenNote;
 let accent = 0;
 let n8 = 1;
 let p = 0;
@@ -46,8 +46,8 @@ updateNote(0, 0, 0);
 
 const ade = (p, a, d, e = 1, q = p % 1) => clip(min(q / a, (e - q) / d));
 
-process(stg, function (data, spb, i0, i, t) {
-  for (; i0 < spb; i0++, t = ++i / sr) {
+process(stg, function (data, length, i0, i, t) {
+  for (; i0 < length; i0++, t = ++i / sr) {
     const beat = div * phase(i, lenPhrase);
     if (i % l0 == 0) {
       const first = i % (2 * lenPhrase) < lenPhrase;
@@ -55,12 +55,12 @@ process(stg, function (data, spb, i0, i, t) {
       n8 = 1 & (0b01111 >> beat % 5);
 
       if (i % l1 == 0) {
-        length = l1;
-        if ((0b1001010000 >> beat) & 1) length = l0;
-        else if (rnd(6) < 1) length = l0;
+        lenNote = l1;
+        if ((0b1001010000 >> beat) & 1) lenNote = l0;
+        else if (rnd(6) < 1) lenNote = l0;
       }
 
-      if (i % length == 0) updateNote(i, first);
+      if (i % lenNote == 0) updateNote(i, first);
     }
 
     const p0 = phase(i, l0);
@@ -81,7 +81,7 @@ process(stg, function (data, spb, i0, i, t) {
 
     let synOut = 0;
     syn: {
-      const e0 = length == l0 ? ade(p0, 0.1, 0.1, 0.9) : asd(p1, 0.05, 0.05);
+      const e0 = lenNote == l0 ? ade(p0, 0.1, 0.1, 0.9) : asd(p1, 0.05, 0.05);
       if (!e0) break syn;
       p += TAU * f * (1 / sr);
       const b0 = 0.5 * a0 * (1 - p1) * sin((2 / 3) * p);

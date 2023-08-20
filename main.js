@@ -1,4 +1,4 @@
-const num = 7;
+const numTracks = 7;
 
 addEventListener("load", () => {
   if (!params.sr) params.sr = 24e3;
@@ -9,7 +9,7 @@ addEventListener("load", () => {
   if (params.tet12 === undefined) params.tet12 = 1;
   params.duration = 2 * params.fade + params.solo;
   params.interval = params.fade + params.solo;
-  params.totalDuration = (num - 1) * params.interval + params.duration;
+  params.totalDuration = (numTracks - 1) * params.interval + params.duration;
 
   if (!params.anlz) q("canvas").style.display = "none";
   q("#info").textContent = `sampleRate: ${params.sr}`;
@@ -44,7 +44,7 @@ function createSeekBar() {
   c.change = (t) => current.setAttributeNS(null, "width", t * wps);
   c.append(current);
 
-  for (let i = num; i--; ) {
+  for (let i = numTracks; i--; ) {
     let x = params.interval * i;
     const li0 = line(x * wps, h, (x += params.fade) * wps, 9);
     const li1 = line(x * wps, 9, (x += params.solo) * wps, 9);
@@ -85,7 +85,7 @@ async function start(seekPos = 0) {
   master.connect(ctx.destination);
 
   // tracks
-  for (let i = num; i--; ) await loadTrack(i, seekTime);
+  for (let i = numTracks; i--; ) await loadTrack(i, seekTime);
 
   if (params.anlz) createAnalyser();
 
@@ -100,7 +100,7 @@ async function setupMasterMessage(master, seekTime) {
     master.port.onmessage = rsl;
   });
 
-  const zero = (num) => (num < 10 ? "0" + num : num);
+  const zero = (n) => (n < 10 ? "0" + n : n);
   const pcm = { amplifier: 1, data: [] };
 
   master.port.onmessage = ({ data }) => {

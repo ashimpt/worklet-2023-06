@@ -1,4 +1,4 @@
-const { min, max } = Math;
+const { min, max, abs } = Math;
 import { createMath2 as getMath2 } from "./math2.js";
 export const sr = sampleRate;
 export const params = {};
@@ -24,19 +24,21 @@ export function process({ id, amp }, play) {
         this.port.postMessage({});
       };
     }
-    process(inputs, { 0: data }, param) {
-      let i = seekFrameFromStart + currentFrame;
-      if (i >= trackLength) return false;
-      const samplesPerBlock = data[0].length;
-      if (i <= -samplesPerBlock) return true;
-      const i0 = i < 0 ? -i : 0;
-      i = i < 0 ? 0 : i;
-      play(data, samplesPerBlock, i0, i, i / sr);
+    process(inputs, { 0: outputData }, param) {
+      let idxTrack = seekFrameFromStart + currentFrame;
+      if (idxTrack >= trackLength) return false;
+      const lenBlock = outputData[0].length;
+      if (idxTrack <= -lenBlock) return true;
+      const idxBlock = idxTrack < 0 ? -idxTrack : 0;
+      idxTrack = idxTrack < 0 ? 0 : idxTrack;
+
+      play(outputData, lenBlock, idxBlock, idxTrack, idxTrack / sr);
+
       // fade
-      for (let i0 = 0; i0 < samplesPerBlock; i0++, i++) {
-        const p = min(1, max(0, i / sr / duration));
+      for (let i = idxTrack, i0 = idxBlock; i0 < lenBlock; i0++, i++) {
+        const p = i / sr / duration;
         const a = amp * min(p / fadeRatio, 1, (1 - p) / fadeRatio) ** 0.7;
-        for (let ch = 2; ch--; ) data[ch][i0] *= a;
+        for (let ch = 2; ch--; ) outputData[ch][i0] *= a;
       }
       return true;
     }

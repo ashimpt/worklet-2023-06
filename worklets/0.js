@@ -11,13 +11,13 @@ const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
 const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 
-const curve = (x) => mix(x, 0.5 + 0.5 * cos(PI + PI * x), 0.3);
+const curve = (x) => mix(x, am(x / 2), 0.3);
 const decay = (p, dr) => clip(1 - (p % 1) / dr);
 const tapes = [0, 1].map(() => new Loop());
 const shifts = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
 
-process(stg, function (data, spb, i0, i, t) {
-  for (; i0 < spb; i0++, t = ++i / sr) {
+process(stg, function (data, length, i0, i, t) {
+  for (; i0 < length; i0++, t = ++i / sr) {
     const u = 60 * (curve(phase(t, 20)) + floor(t / 20));
     const arp = ((7 + (floor(u / 120) % 3)) * floor(u)) % 15;
     const f = freq(arp) * shifts.at((u / 30) % 4);

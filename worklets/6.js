@@ -5,38 +5,43 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 6, amp: 0.64 };
+const stg = { id: 6, amp: 0.596 };
 
 const tet = params.tet12 ? 12 : 9;
 const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
 const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
 
+const decay = (p, h = 0.5, end = 0.6) => clip((end - (p % 1)) / (end - h));
 class Synth {
-  bass = [3, -1];
+  bottom = [3, -1];
   constructor(id) {
     this.o = [2, 1, 0, 0, 1, 2].at(id);
     this.v = [4, 2, 1, 1, 2, 4].at(id);
     this.pattern = rnd(2 ** 8);
     this.pp = id / 5;
+    this.update(0, 0);
   }
-  beat = -1;
-  process(data, i0, i, t, speed) {
+  update(beat, i) {
+    this.nBeat = beat;
     if (i % (32 * sr) == 0) this.pattern = rnd(2 ** 8);
-    const beat = this.v * (t + 0.7 * speed);
-    if (this.beat != floor(beat)) {
-      this.beat = floor(beat);
-      const n1 = 0b11 & (this.pattern >> (2 * floor(beat % 4)));
-      const n0 = 5 * this.o + this.bass.at((beat / 16) % 2) + n1;
-      this.f = freq(n0);
-      this.a = 0.5 * min(1, 8 / (n0 + 5));
-    }
+    const n1 = 0b11 & (this.pattern >> (2 * (beat % 4)));
+    const n0 = 5 * this.o + this.bottom.at((beat / 16) % 2) + n1;
+    this.f = freq(n0);
+    this.a = 0.5 * min(1, 8 / (n0 + 5));
+  }
+  process(data, i0, i, t, modSpeed) {
+    const beat = this.v * (t + 0.7 * modSpeed);
+    if (this.nBeat != floor(beat)) this.update(floor(beat), i);
 
-    const { pp } = this;
-    const p = TAU * this.f * t;
+    const { pp, envEnd } = this;
+    const dec = decay(beat, 0.1, 0.75);
+    if (dec <= 0) return;
     const p0 = beat % 1;
-    const e0 = min(p0 / 1e-3, (1 - p0) ** 2);
-    const b1 = 0.7 * (1 - p0) ** 7 * sin(p / E);
-    const b0 = 1.1 * (1 - p0) ** 5 * sin(E * p + b1);
+    const e0 = min(p0 / 1e-3, pot(dec, 0.75));
+    const p = TAU * this.f * t;
+    const d1 = decay(p0, 5e-3, 0.1);
+    const b1 = !d1 ? 0 : 0.7 * d1 * sin(p / E);
+    const b0 = 1.1 * pot(1 - p0, 6) * sin(E * p + b1);
     const b = this.a * e0 * sin(p + b0);
     for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
   }
@@ -46,15 +51,15 @@ const synths = [0, 1, 2, 3, 4, 5].map((v) => new Synth(v));
 
 const aux0 = [0, 0];
 
-process(stg, function (data, spb, i0, i, t) {
-  for (; i0 < spb; i0++, t = ++i / sr) {
-    const speed = am(t / 32);
-    for (const s of synths) s.process(data, i0, i, t, speed);
+process(stg, function (data, length, i0, i, t) {
+  for (; i0 < length; i0++, t = ++i / sr) {
+    const modSpeed = am(t / 32);
+    for (const s of synths) s.process(data, i0, i, t, modSpeed);
 
     for (let ch = 2; ch--; ) data[ch][i0] = tanh(data[ch][i0]);
 
     aux0[0] = aux0[1] = 0;
-    createBackground(data, spb, i0, i, t);
+    createBackground(data, i0, i, t);
 
     for (let ch = 2; ch--; ) reverb.input(aux0[ch] + 0.1 * data[ch][i0], i, ch);
     reverb.process(data, i0, i);
@@ -71,7 +76,7 @@ const bands = [0, 1, 2, 3].map(() => Filter.create(bandOpt));
 const rndLfo1Opt = { k: exp(-18 / sr), l: sr / 6, f: () => 10 ** -rnd() };
 const rndLfo1 = [0, 1].map(() => Hold.create(rndLfo1Opt));
 
-function createBackground(data, spb, i0, i, t) {
+function createBackground(data, i0, i, t) {
   for (let ch = 2; ch--; ) {
     const tape = tapes[ch];
     const x0 = i + (-1.2 + 1.0 * rndLfo0[ch](i)) * sr;

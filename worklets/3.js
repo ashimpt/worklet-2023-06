@@ -52,8 +52,8 @@ class Bird {
 const birds = [...Array(numBirds)].map((v, i) => new Bird(i));
 const tapes = [0, 1].map(() => new Loop(delayTime));
 
-process(stg, function (data, spb, i0, i, t) {
-  for (; i0 < spb; i0++, t = ++i / sr) {
+process(stg, function (data, length, i0, i, t) {
+  for (; i0 < length; i0++, t = ++i / sr) {
     for (let b of birds) b.process(data, i0, i, t);
 
     for (let ch = 2; ch--; ) {

@@ -7,8 +7,8 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
 const stg = { id: 7, amp: 0.89 };
 
-process(stg, function (data, spb, i0, i, t) {
-  for (; i0 < spb; i0++, t = ++i / sr) {
+process(stg, function (data, length, i0, i, t) {
+  for (; i0 < length; i0++, t = ++i / sr) {
     const p = TAU * 200 * t;
     const b = sin(p + sin(p));
     for (let ch = 2; ch--; ) data[ch][i0] += b;

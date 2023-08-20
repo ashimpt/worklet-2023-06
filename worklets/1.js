@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 1, amp: 0.209 };
+const stg = { id: 1, amp: 0.217 };
 const g2 = 98;
 
 class Synth {
@@ -58,8 +58,8 @@ class Synth {
 
     this.noteCount++;
   }
-  process(data, i0, i, t, spb) {
-    for (; i0 < spb; i0++, t = ++i / sr) {
+  process(data, i0, i, t, length) {
+    for (; i0 < length; i0++, t = ++i / sr) {
       if (i >= this.end) this.trigger(i);
       let { note, start, end, env } = this;
 
@@ -87,16 +87,16 @@ class Synth {
 
 const synths = [new Synth(0), new Synth(1), new Synth(2)];
 
-process(stg, function (data, spb, i0, i, t) {
-  for (const synth of synths) synth.process(data, i0, i, t, spb);
-  reverb(data, spb, i0, i, t);
+process(stg, function (data, length, i0, i, t) {
+  for (const synth of synths) synth.process(data, i0, i, t, length);
+  reverb(data, length, i0, i, t);
 });
 
 const delays = [...Array(14)].map(() => new Loop(1));
 const srt = sr / 1000;
 
-function reverb(data, spb, i0, i, t) {
-  for (; i0 < spb; i0++, t = ++i / sr) {
+function reverb(data, length, i0, i, t) {
+  for (; i0 < length; i0++, t = ++i / sr) {
     for (let ch = 2; ch--; ) delays[ch].set(0.2 * data[ch][i0], i);
     for (let ch = 2; ch--; ) {
       const preOut = delays[ch].iGet(i - 10e-3 * srt);
