@@ -7,9 +7,22 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
 const stg = { id: 6, amp: 0.596 };
 
-const tet = params.tet12 ? 12 : 9;
-const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
-const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
+const tet = params.tet;
+const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
+const notes = baseNotes.map((v) => (!tet ? v : round(crush(v, 1 / tet) * tet)));
+if (tet == 5 || tet == 6) notes[1]--;
+if (tet == 5) notes[4]--;
+const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / (tet || 1));
+
+const avoidNotes = [];
+for (let i = -1, next; i < 20; i = next) {
+  next = i + 1;
+  while (freq(next) - freq(i) < 14) {
+    avoidNotes.push(next);
+    next++;
+  }
+}
+// console.log(avoidNotes);
 
 const decay = (p, h = 0.5, end = 0.6) => clip((end - (p % 1)) / (end - h));
 class Synth {
@@ -25,7 +38,8 @@ class Synth {
     this.nBeat = beat;
     if (i % (32 * sr) == 0) this.pattern = rnd(2 ** 8);
     const n1 = 0b11 & (this.pattern >> (2 * (beat % 4)));
-    const n0 = 5 * this.o + this.bottom.at((beat / 16) % 2) + n1;
+    let n0 = 5 * this.o + this.bottom.at((beat / 16) % 2) + n1;
+    while (avoidNotes.indexOf(n0) != -1) n0++;
     this.f = freq(n0);
     this.a = 0.5 * min(1, 8 / (n0 + 5));
   }

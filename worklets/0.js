@@ -7,20 +7,24 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
 const stg = { id: 0, amp: 2.421 };
 
-const tet = params.tet12 ? 12 : 9;
-const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
-const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
+const tet = params.tet;
+const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
+const notes = baseNotes.map((v) => (!tet ? v : round(crush(v, 1 / tet) * tet)));
+if (tet == 5 || tet == 6) notes[1]--;
+if (tet == 5) notes[4]--;
+const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / (tet || 1));
+
+const transpose = [1, freq(2) / freq(1), freq(6) / freq(1), freq(7) / freq(1)];
 
 const curve = (x) => mix(x, am(x / 2), 0.3);
 const decay = (p, dr) => clip(1 - (p % 1) / dr);
 const tapes = [0, 1].map(() => new Loop());
-const shifts = [0, 1, tet, tet + 1].map((v) => 2 ** (v / tet));
 
 process(stg, function (data, length, i0, i, t) {
   for (; i0 < length; i0++, t = ++i / sr) {
     const u = 60 * (curve(phase(t, 20)) + floor(t / 20));
     const arp = ((7 + (floor(u / 120) % 3)) * floor(u)) % 15;
-    const f = freq(arp) * shifts.at((u / 30) % 4);
+    const f = freq(arp) * transpose.at((u / 30) % 4);
     const o = log2(f / 50);
     const p = TAU * f * t;
     const q = TAU * 2 * t;

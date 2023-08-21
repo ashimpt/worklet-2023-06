@@ -7,9 +7,12 @@ const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
 const stg = { id: 2, amp: 0.371 };
 
-const tet = params.tet12 ? 12 : 9;
-const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
-const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
+const tet = params.tet;
+const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
+const notes = baseNotes.map((v) => (!tet ? v : round(crush(v, 1 / tet) * tet)));
+if (tet == 5 || tet == 6) notes[1]--;
+if (tet == 5) notes[4]--;
+const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / (tet || 1));
 
 const rndMel = rnd();
 let octave = 0;

@@ -5,41 +5,56 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 4, amp: 0.216 };
+const stg = { id: 4, amp: 0.2 };
 
-const tet = params.tet12 ? 12 : 9;
-const notes = params.tet12 ? [0, 4, 5, 7, 11] : [0, 3, 4, 5, 8];
-const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / tet);
-const shift = 2 ** (tet == 9 ? 4 / 9 : 5 / 12);
+const tet = params.tet;
+const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
+const notes = baseNotes.map((v) => (!tet ? v : round(crush(v, 1 / tet) * tet)));
+if (tet == 5 || tet == 6) notes[1]--;
+if (tet == 5) notes[4]--;
+const freq = (n) => 98 * 2 ** (floor(n / 5) + notes.at(mod(n, 5)) / (tet || 1));
+
+const transpose = freq(2) / freq(0);
 
 const rndMelody = rnd();
 const melMod = (x) => 0.5 * am(7 * x);
 const melody = (x) => 0.5 * am(5 * x + melMod(x)) + 0.5 * am(3 * x);
 const lp = Filter.create({ u: 1 });
-const useFilter = sr / 2 > 8000;
+const useFilter = sr / 2 > 7999;
 const sh = SH.create({ l: round(sr / freq(18)) });
 
 let f, a0, lenNote;
 let accent = 0;
-let n8 = 1;
+let click8 = 1;
 let p = 0;
 let b2 = 0;
+
 const bpm = 143;
 const div = 10;
 const dix = 2;
-const l0 = round(((60 / bpm) * sr) / 2 / dix);
-const l1 = dix * l0;
-const lenPhrase = div * l1;
-const durPhrase = lenPhrase / sr;
-const posMel = 22e-3 / durPhrase;
-const velMel0 = 150e-3 / durPhrase;
-const velMel1 = (2 / 3) * velMel0;
+const l0 = round(((60 / bpm) * sr) / 2 / dix); // 1/16
+const l1 = dix * l0; // 1/8
+const lenBar = div * l1;
+const posPhrase = -rnd(0.09, 0.15); // am(3 * x) 0 to 1 -> 0.166...
+const velMelody0 = rnd(0.12, 0.14);
+const velMelody1 = (2 / 3) * velMelody0;
+const accentBeats = [0, 2, 5, 7];
+const accentNotes = [0, 1, 3];
 
-function updateNote(i, first) {
-  const t0 = posMel * (crush(i, 4 * lenPhrase, floor) / sr);
-  const t1 = (first ? velMel0 : velMel1) * ((i % lenPhrase) / sr);
-  f = freq(5 + 18 * melody(rndMelody + t0 + t1));
-  if (phase(i, 4 * lenPhrase) >= 0.5) f *= shift;
+function updateNote(i, nBeat) {
+  const count4Bar = floor(i / lenBar / 4);
+  const phase1Bar = phase(i, lenBar);
+  const t0 = posPhrase * count4Bar; // 4 bar
+  const vel = i % (2 * lenBar) < lenBar ? velMelody0 : velMelody1; // 1 bar
+  const t1 = vel * phase1Bar; // 1 note
+
+  let n = floor(5 + 18 * melody(rndMelody + t0 + t1));
+  if (accentBeats.includes(nBeat % 10)) {
+    while (!accentNotes.includes(n % 5)) n--;
+  }
+  f = freq(n);
+
+  if (phase(i, 4 * lenBar) > 0.499) f *= transpose;
   a0 = min(1, 2 / log2(f / 100));
 }
 updateNote(0, 0, 0);
@@ -48,11 +63,10 @@ const ade = (p, a, d, e = 1, q = p % 1) => clip(min(q / a, (e - q) / d));
 
 process(stg, function (data, length, i0, i, t) {
   for (; i0 < length; i0++, t = ++i / sr) {
-    const beat = div * phase(i, lenPhrase);
+    const beat = div * phase(i, lenBar);
     if (i % l0 == 0) {
-      const first = i % (2 * lenPhrase) < lenPhrase;
       accent = 1 & (0b00101 >> beat % 5);
-      n8 = 1 & (0b01111 >> beat % 5);
+      click8 = 1 & (0b01111 >> beat % 5);
 
       if (i % l1 == 0) {
         lenNote = l1;
@@ -60,20 +74,19 @@ process(stg, function (data, length, i0, i, t) {
         else if (rnd(6) < 1) lenNote = l0;
       }
 
-      if (i % lenNote == 0) updateNote(i, first);
+      if (i % lenNote == 0) updateNote(i, floor(beat));
     }
 
     const p0 = phase(i, l0);
     const p1 = phase(i, l1);
     const auto0 = am(t / 180);
 
-    let envSideDesk = 1;
-    desk: {
-      const e = n8 ? ade(p1, 0.02, 0.2, 0.205) : ade(p0, 0.04, 0.4, 0.41);
-      const v0 = accent * 0.7 + 0.3;
-      const a = auto0 * v0 * e;
-      envSideDesk = 1 - a;
-      if (!e) break desk;
+    let envSideClick = 1;
+    click: {
+      const e = click8 ? ade(p1, 0.02, 0.2, 0.205) : ade(p0, 0.04, 0.4, 0.41);
+      const a = auto0 * (accent * 0.7 + 0.3) * e;
+      envSideClick = 1 - a;
+      if (!e) break click;
       const p = TAU * 4 * 98 * t + 20 * e;
       const b = a * sin(p + e * sin(E * p));
       for (let ch = 2; ch--; ) data[ch][i0] += b;
@@ -99,7 +112,7 @@ process(stg, function (data, length, i0, i, t) {
       const sec = (ch ? 0.26 : 0.23) + 5e-3 * rndLfos[ch](i);
       const fb = tapes[ch].get(i - sr * sec);
       tapes[ch].set(synOut - 0.7 * fb, i);
-      data[ch][i0] += envSideDesk * 0.9 * fb;
+      data[ch][i0] += envSideClick * 0.9 * fb;
     }
   }
 });
