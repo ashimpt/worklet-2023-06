@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 2, amp: 0.371 };
+const stg = { id: 2, amp: 0.395 };
 
 const tet = params.tet;
 const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
@@ -28,8 +28,11 @@ function createNote(t, beat) {
 
   const n = mel0(t);
   const f = freq(n);
-  const repFrq = list.filter((o) => o.f == f).length >= 2;
-  if (repFrq && !mainBeat) return;
+  const repFrq = list.filter((o) => o.f == f);
+  if (repFrq.length >= 2) {
+    if (!mainBeat) return;
+    if (repFrq.filter((o) => !o.long && o.i < sr).length >= 2) return;
+  }
 
   const pp = (count++ % 5) / 4;
   const o = log2(f / 50);

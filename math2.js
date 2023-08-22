@@ -29,7 +29,7 @@ class Abstract {
   }
 }
 
-export class M2 {
+class M2 {
   TAU = 2 * Math.PI;
   clip = (x, lo = 0, hi = 1) => max(lo, min(hi, x));
   mod = (v, m = 1) => ((v % m) + m) % m;
@@ -198,7 +198,7 @@ class Bag extends Abstract {
   };
 }
 
-export class Math2 extends M2 {
+class Math2 extends M2 {
   XorShift = XorShift;
   Loop = Loop;
   Lop = Lop;
@@ -209,7 +209,7 @@ export class Math2 extends M2 {
   Bag = Bag;
 }
 
-export function createMath2(seed) {
+function createMath2(seed) {
   const m2 = new Math2();
   if (!seed) return m2;
 
@@ -225,3 +225,5 @@ export function createMath2(seed) {
 
   return m2;
 }
+
+export { M2, Math2, createMath2 };

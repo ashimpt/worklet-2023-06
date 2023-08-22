@@ -1,11 +1,8 @@
 const { min, max, abs } = Math;
-import { createMath2 as getMath2 } from "./math2.js";
 export const sr = sampleRate;
 export const params = {};
-
-export function createMath2() {
-  return getMath2(params.seed);
-}
+import { createMath2 as createMath2_ } from "./math2.js";
+export const createMath2 = (seed) => createMath2_(seed || params.seed);
 
 export function process({ id, amp }, play) {
   let duration, fadeRatio, seekFrameFromStart, trackLength;

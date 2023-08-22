@@ -12,8 +12,8 @@ class PcmWriter {
     this.length = round(dur * sr);
     this.data = [0, 0].map(() => new Float32Array(this.length));
   }
-  process(x, spb, idx, length, { data }) {
-    const l = min(spb, length - idx);
+  process(x, lenBlock, idx, length, { data }) {
+    const l = min(lenBlock, length - idx);
     for (let i = 0; i < l; i++, idx++) {
       data[0][idx] += x[0][i];
       data[1][idx] += x[1][i];
@@ -32,12 +32,12 @@ const peakMeter = {
   peak: 0,
   peaks: [0, 0],
   sumSq: [0.01, 0.01],
-  process(inp, spb) {
+  process(inp, lenBlock) {
     const { peaks, sumSq } = this;
     let blockPeak = 0;
     for (let ch = 2; ch--; ) {
       let chPeak = 0;
-      for (let i = 0; i < spb; i++) {
+      for (let i = 0; i < lenBlock; i++) {
         const v = inp[ch][i];
         chPeak = max(chPeak, abs(v));
         sumSq[ch] += v * v;
@@ -48,9 +48,9 @@ const peakMeter = {
     this.value = max(this.value, blockPeak);
     this.peak = max(...peaks);
   },
-  limit(inp, spb) {
+  limit(inp, lenBlock) {
     for (let ch = 2, v = this.peak; v > 1 && ch--; )
-      for (let i = spb; i--; ) inp[ch][i] /= v;
+      for (let i = lenBlock; i--; ) inp[ch][i] /= v;
   },
   db: (v) => (20 * log10(v)).toFixed(1),
   post(port, length, t) {
@@ -69,7 +69,6 @@ class processor extends AudioWorkletProcessor {
     super(...args);
     this.port.onmessage = ({ data }) => {
       Object.assign(params, data);
-      // if (data.seed) Math2.setSeed(data.seed);
 
       this.seekFrame = round(sr * data.seekTime);
       this.length = data.totalDuration * sr;
@@ -91,26 +90,26 @@ class processor extends AudioWorkletProcessor {
       return;
     }
 
-    const spb = oup[0].length;
+    const lenBlock = oup[0].length;
     for (let ch = 2; ch--; ) {
-      for (let i = 0; i < spb; i++) {
+      for (let i = 0; i < lenBlock; i++) {
         oup[ch][i] = hps[ch](inp[ch][i] || 0);
       }
     }
 
-    if (writer) writer.process(oup, spb, idx, this.length, writer);
+    if (writer) writer.process(oup, lenBlock, idx, this.length, writer);
 
-    peakMeter.process(oup, spb);
-    peakMeter.limit(oup, spb);
+    peakMeter.process(oup, lenBlock);
+    peakMeter.limit(oup, lenBlock);
 
     const t = floor(idx / sr);
-    if (!currentFrame || t != floor((idx + spb) / sr)) {
-      this.secProcess(spb, idx, t);
+    if (!currentFrame || t != floor((idx + lenBlock) / sr)) {
+      this.secProcess(lenBlock, idx, t);
     }
 
     return true;
   }
-  secProcess(spb, idx, ct) {
+  secProcess(lenBlock, idx, ct) {
     const t = ct + (currentFrame ? 1 : 0);
 
     if (params.warn) {
@@ -118,11 +117,11 @@ class processor extends AudioWorkletProcessor {
       ampData[min] = max(ampData[min] || 0, peakMeter.value);
       if (floor(t) % 60 == 0) console.log(ampData.at(-2) || 0);
       if (peakMeter.value > params.warn / 100) {
-        console.warn({ amp: peakMeter.value.toFixed(3), t });
+        console.warn({ a: peakMeter.value, t });
       }
     }
 
-    peakMeter.post(this.port, idx + spb, t);
+    peakMeter.post(this.port, idx + lenBlock, t);
     peakMeter.value = 0;
   }
 }

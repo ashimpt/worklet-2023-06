@@ -1,21 +1,20 @@
 class Analyser {
   audioCtx;
   canvasCtx;
-  analyser;
+  node;
   dataArray;
   freqInterval;
   fftSize = 2 ** 11;
   mode = 0;
   zoom = 1;
-  constructor(canvasEl, audioCtx_) {
-    const ctx = (this.audioCtx = audioCtx_ || new AudioContext());
-    const analyser = (this.analyser = ctx.createAnalyser());
+  constructor(canvasEl, audioCtx_ = new AudioContext()) {
+    const ctx = (this.audioCtx = audioCtx_);
+    const analyser = (this.node = ctx.createAnalyser());
     analyser.fftSize = this.fftSize;
     this.dataArray = new Uint8Array(this.fftSize / 2);
     this.freqInterval = ctx.sampleRate / this.fftSize;
     this.setupCanvas(canvasEl);
   }
-
   setupCanvas(canvasEl) {
     const ctx = (this.canvasCtx = canvasEl.getContext("2d"));
     this.canvasEvent = this.toggleMode.bind(this);
@@ -24,7 +23,8 @@ class Analyser {
   }
   toggleMode() {
     this.mode = ++this.mode % 3;
-    this.mode < 2 ? this.startLoop() : this.stopLoop();
+    this.stopLoop();
+    if (this.mode < 2) this.startLoop();
   }
   animId = null;
   frameCount = 0;
@@ -44,11 +44,12 @@ class Analyser {
     const h = ctx.canvas.height;
     const l = Math.floor(this.dataArray.length / this.zoom);
     if (this.mode == 0) this.drawTime(ctx, w, h, l, this.dataArray);
-    else this.drawFreq(ctx, w, h, l, this.dataArray);
+    else if (this.mode == 1) this.drawFreq(ctx, w, h, l, this.dataArray);
+    else this.stopLoop();
     // ctx.fillText(Math.floor(this.frameCount++ / 60), 10, 10);
   };
   drawTime(ctx, w, h, l, array) {
-    this.analyser.getByteTimeDomainData(array);
+    this.node.getByteTimeDomainData(array);
     ctx.fillStyle = "#333";
     ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = "#fff";
@@ -62,7 +63,7 @@ class Analyser {
   drawFreq(ctx, w, h, l, array) {
     if (this.#freqBG) ctx.drawImage(this.#freqBG, 0, 0);
     else this.#drawFreqBackGround(ctx, w, h, l);
-    this.analyser.getByteFrequencyData(array);
+    this.node.getByteFrequencyData(array);
     ctx.fillStyle = "#fff";
     for (let i = 1; i < l; i++) {
       const x = Math.log2(i) / Math.log2(l);
@@ -82,13 +83,15 @@ class Analyser {
       ctx.fillRect(hzToX(100 * 2 ** oct), 0, 1, h);
     }
     ctx.fillStyle = "tan";
-    for (const hz of [10, 100, 1e3, 1e4, 2e4]) {
+    for (const hz of [10, 100, 1e3, 10e3]) {
       ctx.fillRect(hzToX(hz), 0, 1, h);
 
-      for (let i = 1, l = hz == 1e3 ? 24 : 9; i <= l; i++) {
+      for (let i = 1, l = hz == 1e3 ? 19 : 9; i <= l; i++) {
         ctx.fillRect(hzToX(hz * i), h / 2 - 2, 1, 4);
       }
     }
+    ctx.fillRect(hzToX(20e3), 0, 1, h);
+
     this.#freqBG = new Image();
     this.#freqBG.src = ctx.canvas.toDataURL();
   }

@@ -152,5 +152,5 @@ function createAnalyser() {
     if (ctx && ctx.state == "running") analyser.startLoop();
     else analyser.stopLoop();
   });
-  master.connect(analyser.analyser);
+  master.connect(analyser.node);
 }
