@@ -6,7 +6,6 @@ addEventListener("load", () => {
   if (params.fade === undefined) params.fade = 60;
   if (params.solo === undefined) params.solo = 60;
   if (params.anlz === undefined) params.anlz = 1;
-  if (params.tet === undefined) params.tet = 12;
   params.duration = 2 * params.fade + params.solo;
   params.interval = params.fade + params.solo;
   params.totalDuration = (numTracks - 1) * params.interval + params.duration;

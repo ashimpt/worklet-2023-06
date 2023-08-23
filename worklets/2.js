@@ -57,9 +57,9 @@ function synth(data, i0, t, s) {
   const p = TAU * f * t0;
   let b = mix(0.7, 1, o / 4);
   if (long) {
-    const a1 = (5 / o) * asd(t + 4 * asd(t / 4.5, 0.5), 0.3, 0.3);
+    const a1 = (7 / o) * asd(t + 4 * asd(t / 4.5, 0.5), 0.3, 0.3);
     const b1 = a1 * sin(fm * p);
-    const e0 = 0.4 * asd(p0, 1e-3, 1e-3);
+    const e0 = 0.4 * asd(p0, 0.04, 1e-3);
     b *= 0.7 * e0 * sin(p + b1);
   } else {
     const b0a = 2 * decay(t0, 0.02) * sin(3 * p);

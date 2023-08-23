@@ -52,7 +52,8 @@ class Synth {
     this.end = i + round(dr * sr);
 
     if (this.noteCount == this.stopCount) {
-      this.end = crush(this.end + rnd(1, 4) * sr, sr / 2);
+      this.end = crush(this.end + rnd(1, 3) * sr, sr / 2);
+      while ((this.end / sr) % 23 > 15) this.end += sr;
       this.rest = true;
     }
 

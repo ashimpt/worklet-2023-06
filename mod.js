@@ -14,7 +14,7 @@ export function process({ id, amp }, play) {
         const { startTime, fade, seekTime } = data;
 
         duration = data.duration;
-        fadeRatio = fade / duration;
+        fadeRatio = fade / duration || 1e-9;
         seekFrameFromStart = parseInt(sr * (seekTime - startTime));
         trackLength = parseInt(sr * duration);
 
