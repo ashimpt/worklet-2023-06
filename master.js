@@ -2,30 +2,9 @@ const { max, min, abs, round, floor, log10, sqrt } = Math;
 import { Math2 } from "./math2.js";
 import { params } from "./mod.js";
 
+const sr = sampleRate;
 const filter = new Math2().Filter;
 const hps = [0, 1].map(() => filter.create({ type: "high", f: 20 }));
-const sr = sampleRate;
-let writer;
-
-class PcmWriter {
-  constructor(dur = 1) {
-    this.length = round(dur * sr);
-    this.data = [0, 0].map(() => new Float32Array(this.length));
-  }
-  process(x, lenBlock, idx, length, { data }) {
-    const l = min(lenBlock, length - idx);
-    for (let i = 0; i < l; i++, idx++) {
-      data[0][idx] += x[0][i];
-      data[1][idx] += x[1][i];
-    }
-  }
-  post(port, maxAmp) {
-    const amplifier = 0.89 / maxAmp || void 0;
-    port.postMessage({ amplifier });
-    port.postMessage(this.data[0], [this.data[0].buffer]);
-    port.postMessage(this.data[1], [this.data[1].buffer]);
-  }
-}
 
 const peakMeter = {
   value: 0,
@@ -65,66 +44,71 @@ const peakMeter = {
 class processor extends AudioWorkletProcessor {
   seekFrame = 0;
   length = 0;
+  amp = 1; //TODO: prevent clipping
   constructor(...args) {
     super(...args);
     this.port.onmessage = ({ data }) => {
       Object.assign(params, data);
 
       this.seekFrame = round(sr * data.seekTime);
-      this.length = data.totalDuration * sr;
+      this.length = data.length;
 
-      if (data.rec && !data.seekTime) {
-        console.warn("rec");
-        writer = new PcmWriter(data.totalDuration);
-      } else if (data.rec) console.warn("not rec");
+      if (data.rec) this.amp = 0.1;
 
       this.port.postMessage({ loaded: 1 });
     };
   }
   process({ 0: inp }, { 0: oup }) {
     const idx = this.seekFrame + currentFrame;
-    if (idx >= this.length) {
-      if (writer) writer.post(this.port, peakMeter.peak);
-      this.port.postMessage({ end: 1 });
-      if (ampData[0]) console.log({ ampData });
-      return;
-    }
-
     const lenBlock = oup[0].length;
-    for (let ch = 2; ch--; ) {
+    for (let ch = 2, a = this.amp; ch--; ) {
       for (let i = 0; i < lenBlock; i++) {
-        oup[ch][i] = hps[ch](inp[ch][i] || 0);
+        oup[ch][i] = a * hps[ch](inp[ch][i] || 0);
       }
     }
-
-    if (writer) writer.process(oup, lenBlock, idx, this.length, writer);
 
     peakMeter.process(oup, lenBlock);
     peakMeter.limit(oup, lenBlock);
 
-    const t = floor(idx / sr);
-    if (!currentFrame || t != floor((idx + lenBlock) / sr)) {
-      this.secProcess(lenBlock, idx, t);
+    const ct = floor(idx / sr);
+    const end = idx + lenBlock >= this.length;
+
+    if (!currentFrame || ct != floor((idx + lenBlock) / sr)) {
+      this.processSec(lenBlock, idx, ct, end);
     }
 
-    return true;
+    if (!end) return true;
+    else {
+      const amplifier = 0.89 / peakMeter.peak || void 0;
+      this.port.postMessage({ amplifier });
+      if (ampData[0] !== undefined) console.log({ ampData });
+      if (!params.rec) this.port.postMessage({ end: 1 });
+      return false;
+    }
   }
-  secProcess(lenBlock, idx, ct) {
+
+  processSec(lenBlock, idx, ct, end) {
     const t = ct + (currentFrame ? 1 : 0);
 
+    if (params.rec && peakMeter.peak > 1) console.error("clipping");
     if (params.warn) {
       const min = floor(t / 60);
-      ampData[min] = max(ampData[min] || 0, peakMeter.value);
-      if (floor(t) % 60 == 0) console.log(ampData.at(-2) || 0);
-      if (peakMeter.value > params.warn / 100) {
-        console.warn({ a: peakMeter.value, t });
+      if (peakMeter.value / this.amp > params.warn / 100) {
+        console.warn({ a: peakMeter.value / this.amp, t });
       }
+
+      ampData[min] = max(ampData[min] || 0, peakMeter.value / this.amp);
+      if (t % 60 == 0) logStyle(ampData.at(-2) || NaN);
     }
 
-    peakMeter.post(this.port, idx + lenBlock, t);
+    if (!params.rec || end || t % 10 == 0) {
+      peakMeter.post(this.port, idx + lenBlock, t);
+    }
     peakMeter.value = 0;
   }
 }
 
 const ampData = [];
+const logStyle = (s) => console.log("%c" + s, "font-size:smaller");
+
 registerProcessor("master", processor);

@@ -46,7 +46,7 @@ function createNote(t, beat) {
   list.push({ i: 0, n, f, o, pp, long, l, fm });
 }
 
-const decay = (t, dr) => max(0, 1 - t / dr);
+const decay = (t, e) => max(0, 1 - t / e);
 let aux0 = 0;
 
 function synth(data, i0, t, s) {

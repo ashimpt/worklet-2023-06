@@ -59,3 +59,10 @@ pSvg.rect = (x, y, width, height) => {
   elem.setAttributeNS(null, "height", height);
   return elem;
 };
+
+function secToTimeString(t) {
+  const date = new Date(t * 1e3);
+  let s = date.toISOString().substring(11, 19);
+  if (t >= 24 * 60 * 60) s = parseInt(t / 24 / 60 / 60) + "d " + s;
+  return s.replace(/^00:/, "");
+}

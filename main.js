@@ -1,4 +1,5 @@
 const numTracks = 7;
+let ctx, master, analyser, ampWav;
 
 addEventListener("load", () => {
   if (!params.sr) params.sr = 24e3;
@@ -9,17 +10,22 @@ addEventListener("load", () => {
   params.duration = 2 * params.fade + params.solo;
   params.interval = params.fade + params.solo;
   params.totalDuration = (numTracks - 1) * params.interval + params.duration;
+  params.length = params.sr * params.totalDuration;
 
   if (!params.anlz) q("canvas").style.display = "none";
-  q("#info").textContent = `sampleRate: ${params.sr}`;
-
   const cw = q("canvas").offsetWidth;
   q("canvas").width = cw;
   q("canvas").height = parseInt(cw / 5);
 
+  const dur = secToTimeString(params.totalDuration);
+  q("#info").textContent = `sampleRate: ${params.sr}, ` + `duration: ${dur}`;
+
   q("#output").append(createSeekBar());
-  q("#output").append(createButton("play", () => start()));
-  q("#output").append(createButton("suspend", () => changeState()));
+  if (params.rec) q("#output").append(createButton("rec", () => start()));
+  else {
+    q("#output").append(createButton("play", () => start()));
+    q("#output").append(createButton("suspend", () => changeState()));
+  }
 
   addEventListener("resize", () => {
     q("#seekbar").replaceWith(createSeekBar());
@@ -27,9 +33,9 @@ addEventListener("load", () => {
 });
 
 function createSeekBar() {
-  const width = q("#output").offsetWidth;
-  const [w, h] = [width, parseInt(width / 10)];
-  const wps = width / params.totalDuration;
+  const w = document.body.offsetWidth;
+  const h = parseInt(document.body.offsetHeight / 9);
+  const wps = w / params.totalDuration;
 
   const { canvas, rect, line } = pSvg;
   const c = canvas(w, h);
@@ -38,10 +44,10 @@ function createSeekBar() {
   c.style.display = "block";
   c.id = "seekbar";
 
-  const current = rect(0, 0, 1, h);
-  current.setAttribute("fill", "#666");
-  c.change = (t) => current.setAttributeNS(null, "width", t * wps);
-  c.append(current);
+  const progress = rect(0, 0, 1, h);
+  progress.setAttribute("fill", "#666");
+  c.change = (t) => progress.setAttributeNS(null, "width", t * wps);
+  c.append(progress);
 
   for (let i = numTracks; i--; ) {
     let x = params.interval * i;
@@ -63,72 +69,62 @@ const changeState = async (method) => {
   if (ctx.state == "closed") ctx = null;
 };
 
-let ctx, master, analyser;
-
 async function start(seekPos = 0) {
   if (/⏳/.test(document.title) && !confirm("start?")) return;
   document.title = "⏳" + title;
 
+  if (params.rec) await render();
+  else await play(seekPos);
+
+  document.title = title;
+}
+
+async function play(seekPos) {
   if (analyser) analyser.close();
   if (ctx) ctx.close();
 
-  // context
   ctx = new AudioContext({ sampleRate: params.sr });
   await changeState("suspend");
+
   const seekTime = parseInt(params.totalDuration * seekPos);
-
-  //  master
-  await ctx.audioWorklet.addModule("master.js");
-  master = await new AudioWorkletNode(ctx, "master", {});
-  await setupMasterMessage(master, seekTime);
-  master.connect(ctx.destination);
-
-  // tracks
-  for (let i = numTracks; i--; ) await loadTrack(i, seekTime);
+  await setupMaster(seekTime);
+  for (let i = numTracks; i--; ) await setupTrack(i, seekTime);
 
   if (params.anlz) createAnalyser();
-
-  document.title = title;
   changeState("resume");
 }
 
-async function setupMasterMessage(master, seekTime) {
-  const mess = Object.assign(params, { seekTime });
+async function render() {
+  ctx = new OfflineAudioContext({
+    numberOfChannels: 2,
+    sampleRate: params.sr,
+    length: params.length,
+  });
+
+  await setupMaster(0);
+  for (let i = numTracks; i--; ) await setupTrack(i, 0);
+
+  const audioBuffer = await ctx.startRendering();
+  const data = [0, 1].map((ch) => audioBuffer.getChannelData(ch));
+
+  while (!ampWav) await new Promise((rsl) => setTimeout(rsl, 100));
+  createWav(data, ampWav);
+  ampWav = 0;
+}
+
+async function setupMaster(seekTime) {
+  await ctx.audioWorklet.addModule("master.js");
+  master = await new AudioWorkletNode(ctx, "master", {});
   await new Promise((rsl) => {
-    master.port.postMessage(mess);
+    master.port.postMessage(Object.assign({ seekTime }, params));
     master.port.onmessage = rsl;
   });
 
-  const zero = (n) => (n < 10 ? "0" + n : n);
-  const pcm = { amplifier: 1, data: [] };
-
-  master.port.onmessage = ({ data }) => {
-    if (data.info) {
-      const info = data.info;
-      q("#seekbar").change(info.t);
-
-      info.time = zero(parseInt(info.t / 60)) + ":" + zero(info.t % 60);
-      info.t = undefined;
-      q("#info").textContent = JSON.stringify(info).replace(/[\"{}]/g, "");
-    }
-    if (data.amplifier) pcm.amplifier = data.amplifier;
-    if (data.buffer) {
-      pcm.data.push(data); // typed array
-      if (pcm.data.length == 2) createWav(pcm);
-    }
-    if (data.end) changeState("close");
-  };
-
-  function createWav({ data, amplifier }) {
-    changeState("suspend");
-    const opt = { amplifier, sampleRate: params.sr, bitsPerSample: params.bit };
-    const url = new PcmToWave(opt).createBlobURL(data);
-    const txt = new Date().toLocaleTimeString() + ".wav";
-    q("#output").append(create("br"), createLink(url, txt));
-  }
+  master.port.onmessage = handleMasterMessage;
+  master.connect(ctx.destination);
 }
 
-async function loadTrack(id, seekTime) {
+async function setupTrack(id, seekTime) {
   await ctx.audioWorklet.addModule(`worklets/${id}.js`);
 
   const worklet = await new AudioWorkletNode(ctx, id, {
@@ -139,10 +135,29 @@ async function loadTrack(id, seekTime) {
 
   await new Promise((rsl) => {
     const mess = { seekTime, startTime: id * params.interval };
-    worklet.port.postMessage(Object.assign(params, mess));
+    worklet.port.postMessage(Object.assign(mess, params));
     worklet.port.onmessage = rsl;
   });
   worklet.connect(master);
+}
+
+function handleMasterMessage({ data }) {
+  if (data.info) {
+    q("#seekbar").change(data.info.t);
+    data.info.time = secToTimeString(data.info.t);
+    data.info.t = undefined;
+    q("#info").textContent = JSON.stringify(data.info).replace(/[\"{}]/g, "");
+  }
+
+  if (data.amplifier) ampWav = data.amplifier;
+  if (data.end) changeState("close");
+}
+
+function createWav(data, amplifier) {
+  const opt = { amplifier, sampleRate: params.sr, bitsPerSample: params.bit };
+  const url = new PcmToWave(opt).createBlobURL(data);
+  const txt = new Date().toLocaleTimeString() + ".wav";
+  q("#output").append(create("br"), createLink(url, txt));
 }
 
 function createAnalyser() {

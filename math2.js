@@ -40,32 +40,32 @@ class M2 {
   pan = (x) => x / (0.4 + 0.6 * x);
   am = (p) => 0.5 - 0.5 * cos(2 * PI * p);
   asd = (x, a = 0.01, d = 1 - a) => min((x % 1) / a, 1, (1 - (x % 1)) / d);
-  lerpArray(arr, x) {
+  lerpArray = (arr, x) => {
     const fx = floor(x);
     const d0 = arr[fx];
     return d0 + (arr[fx + 1] - d0) * (x - fx) || 0;
-  }
-  isPrime(v) {
+  };
+  isPrime = (v) => {
     if (v < 3) return v == 2;
     if (isInteger(v / 2)) return false;
     for (let i = 3, l = sqrt(v); i <= l; i += 2) {
       if (isInteger(v / i)) return false;
     }
     return true;
-  }
+  };
 
   random = Math.random;
   setSeed = (seed) => (this.random = XorShift.create(seed));
   rnd = (lo = 1, hi = 0, e = 1) => lo + (hi - lo) * this.random() ** e;
   rndTriangular = (med = 0.5, r = this.random()) =>
     r < med ? sqrt(r / med) * med : 1 - sqrt((1 - r) / (1 - med)) * (1 - med);
-  shuffle(array) {
+  shuffle = (array) => {
     for (let i = 0; i < array.length; i++) {
       const r = floor(array.length * this.random());
       [array[i], array[r]] = [array[r], array[i]];
     }
     return array;
-  }
+  };
 }
 
 const { mod, mix, lerpArray, shuffle } = new M2();
