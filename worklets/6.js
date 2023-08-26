@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 6, amp: 0.596 };
+const stg = { id: 6, amp: 0.608 };
 
 const tet = params.tet;
 const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));

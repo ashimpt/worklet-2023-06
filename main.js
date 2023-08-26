@@ -34,7 +34,7 @@ addEventListener("load", () => {
 
 function createSeekBar() {
   const w = document.body.offsetWidth;
-  const h = parseInt(document.body.offsetHeight / 9);
+  const h = parseInt(Math.max(w / 9, document.body.offsetHeight / 9));
   const wps = w / params.totalDuration;
 
   const { canvas, rect, line } = pSvg;
@@ -70,19 +70,19 @@ const changeState = async (method) => {
 };
 
 async function start(seekPos = 0) {
-  if (/⏳/.test(document.title) && !confirm("start?")) return;
+  if (/⏳/.test(document.title)) return;
   document.title = "⏳" + title;
 
-  if (params.rec) await render();
+  if (analyser) analyser.close();
+  if (ctx && ctx.close) ctx.close();
+
+  if (params.rec && !seekPos) await render();
   else await play(seekPos);
 
   document.title = title;
 }
 
 async function play(seekPos) {
-  if (analyser) analyser.close();
-  if (ctx) ctx.close();
-
   ctx = new AudioContext({ sampleRate: params.sr });
   await changeState("suspend");
 
@@ -153,9 +153,10 @@ function handleMasterMessage({ data }) {
   if (data.end) changeState("close");
 }
 
-function createWav(data, amplifier) {
+async function createWav(data, amplifier) {
   const opt = { amplifier, sampleRate: params.sr, bitsPerSample: params.bit };
-  const url = new PcmToWave(opt).createBlobURL(data);
+  // const url = new PcmToWave(opt).createBlobUrl(data);
+  const url = await PcmToWave.createUrl(opt, data);
   const txt = new Date().toLocaleTimeString() + ".wav";
   q("#output").append(create("br"), createLink(url, txt));
 }

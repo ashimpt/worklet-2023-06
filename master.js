@@ -43,19 +43,17 @@ const peakMeter = {
 
 class processor extends AudioWorkletProcessor {
   seekFrame = 0;
-  length = 0;
   amp = 1; //TODO: prevent clipping
   constructor(...args) {
     super(...args);
     this.port.onmessage = ({ data }) => {
       Object.assign(params, data);
 
-      this.seekFrame = round(sr * data.seekTime);
-      this.length = data.length;
+      this.seekFrame = round(sr * params.seekTime);
+      if (this.seekFrame) params.rec = 0;
+      if (params.rec) this.amp = 0.1;
 
-      if (data.rec) this.amp = 0.1;
-
-      this.port.postMessage({ loaded: 1 });
+      this.port.postMessage({});
     };
   }
   process({ 0: inp }, { 0: oup }) {
@@ -71,7 +69,7 @@ class processor extends AudioWorkletProcessor {
     peakMeter.limit(oup, lenBlock);
 
     const ct = floor(idx / sr);
-    const end = idx + lenBlock >= this.length;
+    const end = idx + lenBlock >= params.length;
 
     if (!currentFrame || ct != floor((idx + lenBlock) / sr)) {
       this.processSec(lenBlock, idx, ct, end);
@@ -98,7 +96,7 @@ class processor extends AudioWorkletProcessor {
       }
 
       ampData[min] = max(ampData[min] || 0, peakMeter.value / this.amp);
-      if (t % 60 == 0) logStyle(ampData.at(-2) || NaN);
+      if (t % 60 == 0) logStyle(min - 1 + ":" + (ampData.at(-2) || NaN));
     }
 
     if (!params.rec || end || t % 10 == 0) {

@@ -189,7 +189,6 @@ class Hold extends Abstract {
 class Bag extends Abstract {
   bag = [0, 1];
   currentBag = [];
-  random = Math.random;
   shuffle = shuffle;
   process = () => {
     if (!this.currentBag.length)
@@ -210,20 +209,20 @@ class Math2 extends M2 {
 }
 
 function createMath2(seed) {
-  const m2 = new Math2();
-  if (!seed) return m2;
+  const math2 = new Math2();
+  if (!seed) return math2;
 
-  m2.setSeed(seed);
+  math2.setSeed(seed);
 
-  m2.Hold = class extends Hold {
-    f = m2.random;
+  math2.Hold = class extends Hold {
+    f = math2.random;
   };
 
-  m2.Bag = class extends Bag {
-    random = m2.random;
+  math2.Bag = class extends Bag {
+    shuffle = math2.shuffle;
   };
 
-  return m2;
+  return math2;
 }
 
 export { M2, Math2, createMath2 };

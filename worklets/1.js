@@ -2,10 +2,10 @@
 const {abs,ceil,cos,exp,floor,log,log2,log10,max,min,pow,round,sign,sin,sqrt,tanh,trunc,E,PI}=Math;
 import { createMath2, sr, params, process } from "../mod.js";
 const math2 = createMath2();
-const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
-const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
+const { TAU, mod, mix, clip, phase, crush, pot, pan, am, decay, asd } = math2;
+const { rnd, Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 1, amp: 0.223 };
+const stg = { id: 1, amp: 0.23 };
 const g2 = 98;
 
 class Synth {

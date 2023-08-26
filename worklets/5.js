@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 5, amp: 0.329 };
+const stg = { id: 5, amp: 0.351 };
 const g2 = 98;
 let time = 0;
 
@@ -20,6 +20,7 @@ const lop1 = Lop.create({ k: exp(-333 / sr) });
 let oct = 0;
 let p1 = 0;
 let fMod;
+
 process(stg, function (data, length, i0, i, t) {
   time = t;
   for (; i0 < length; i0++, t = ++i / sr) {

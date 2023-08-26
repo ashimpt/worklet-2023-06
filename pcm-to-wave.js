@@ -7,7 +7,22 @@ class PcmToWave {
     Object.assign(this, options);
   }
 
-  createBlobURL(buffers) {
+  static async createUrl(opt, data) {
+    const worker = await new Worker("pcm-to-wave-worker.js");
+    worker.postMessage(Object.assign({ isOptions: 1 }, opt));
+    for (let ch = 0; ch < data.length; ch++) {
+      worker.postMessage(data[ch], [data[ch].buffer]);
+    }
+
+    return await new Promise((resolve) => {
+      worker.onmessage = ({ data }) => {
+        const blob = new Blob([data], { type: "audio/wav" });
+        resolve(URL.createObjectURL(blob));
+      };
+    });
+  }
+
+  createBlobUrl(buffers) {
     const blob = this.createBlob(buffers);
     return URL.createObjectURL(blob);
   }
@@ -17,12 +32,12 @@ class PcmToWave {
     return new Blob([uint8array], { type: "audio/wav" });
   }
 
-  convert(inBuffers) {
-    const buffers = this.#setupChannel(inBuffers, this.numChannels);
-    return this.#createWaveFormatData(buffers);
+  convert(buffers) {
+    const buff = this.#setupChannel(buffers);
+    return this.#createWaveFormatData(buff);
   }
 
-  #setupChannel(inputs, numChs) {
+  #setupChannel(inputs, numChs = this.numChannels) {
     const outputs = [];
     if (inputs[0].length) {
       if (inputs.length != numChs) console.warn("numChannels");
@@ -37,14 +52,20 @@ class PcmToWave {
   }
 
   #createWaveFormatData(buffers) {
-    const dataChunks = [];
-    for (let i = 0; i < this.numChannels; i++)
-      dataChunks[i] = this.#convertIntoDataChunk(buffers[i], this.amplifier);
-    const mergedChunk = this.#mergeChannels(dataChunks);
-    return this.#addHeader(mergedChunk);
+    // http://soundfile.sapp.org/doc/WaveFormat/
+    const chData = [];
+    for (let i = 0; i < this.numChannels; i++) {
+      chData[i] = this.#convertIntoUint8(buffers[i], this.amplifier);
+    }
+
+    const dataLength = chData[0].length * this.numChannels;
+    const output = new Uint8Array(44 + dataLength);
+    this.#setHeader(output, dataLength, this);
+    this.#setDataChunk(output, chData);
+    return output;
   }
 
-  #convertIntoDataChunk(x, amp = 1) {
+  #convertIntoUint8(x, amp) {
     switch (this.bitsPerSample) {
       case 8: {
         const y = new Uint8Array(x.length);
@@ -83,41 +104,12 @@ class PcmToWave {
         throw new Error("bitsPerSample");
     }
   }
-
-  #mergeChannels(inputs) {
-    const numChannels = this.numChannels;
-    const length = inputs[0].length * numChannels;
-    const output = new Uint8Array(length);
-    const bytesPerSample = this.bitsPerSample / 8;
-    let sampleIndex = 0;
-    let outputIndex = 0;
-    while (outputIndex < length) {
-      for (let ch = 0; ch < numChannels; ch++) {
-        for (let b = 0; b < bytesPerSample; b++) {
-          output[outputIndex++] = inputs[ch][sampleIndex + b];
-        }
-      }
-      sampleIndex += bytesPerSample;
-    }
-    return output;
-  }
-
-  #addHeader(data) {
-    const header = this.#createHeader(data, this);
-    const headerLen = header.length;
-    const output = new Uint8Array(headerLen + data.length);
-    for (let i = headerLen; i--; ) output[i] = header[i];
-    for (let i = data.length; i--; ) output[headerLen + i] = data[i];
-
-    return output;
-  }
-
-  #createHeader(data, { numChannels, sampleRate }) {
+  
+  #setHeader(output, subChunk2Size, { numChannels, sampleRate }) {
     const bitsPerSample = this.bitsPerSample,
       audioFormat = bitsPerSample == 32 ? 3 : 1,
       byteRate = (sampleRate * numChannels * bitsPerSample) / 8,
       blockAlign = (numChannels * bitsPerSample) / 8,
-      subChunk2Size = data.length,
       chunkSize = 36 + subChunk2Size;
 
     const buffer = new ArrayBuffer(44);
@@ -138,6 +130,22 @@ class PcmToWave {
       view.setUint32(36, 0x64617461);
       view.setUint32(40, subChunk2Size, 1);
     }
-    return new Uint8Array(buffer);
+    output.set(new Uint8Array(buffer));
+  }
+
+  #setDataChunk(output, chData) {
+    const outputLength = output.length;
+    const numChannels = this.numChannels;
+    const bytesPerSample = this.bitsPerSample / 8;
+    let outputIndex = 44;
+    let chDataIndex = 0;
+    while (outputIndex < outputLength) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        for (let b = 0; b < bytesPerSample; b++) {
+          output[outputIndex++] = chData[ch][chDataIndex + b];
+        }
+      }
+      chDataIndex += bytesPerSample;
+    }
   }
 }

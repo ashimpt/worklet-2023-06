@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 4, amp: 0.2 };
+const stg = { id: 4, amp: 0.208 };
 
 const tet = params.tet;
 const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
@@ -31,10 +31,9 @@ let b2 = 0;
 
 const bpm = 143;
 const div = 10;
-const dix = 2;
-const l0 = round(((60 / bpm) * sr) / 2 / dix); // 1/16
-const l1 = dix * l0; // 1/8
-const lenBar = div * l1;
+const l16 = round(((60 / bpm) * sr) / 4);
+const l8 = 2 * l16;
+const lenBar = div * l8;
 const posPhrase = -rnd(0.09, 0.15); // am(3 * x) 0 to 1 -> 0.166...
 const velMelody0 = rnd(0.12, 0.14);
 const velMelody1 = (2 / 3) * velMelody0;
@@ -59,31 +58,32 @@ function updateNote(i, nBeat) {
 }
 updateNote(0, 0, 0);
 
-const ade = (p, a, d, e = 1, q = p % 1) => clip(min(q / a, (e - q) / d));
+const decay = (x, s = 0.5, e = 0.6) => clip((e - (x % 1)) / (e - s));
+const env = (p, a, s, e, q = p % 1) => min(q / a, decay(q, s, e));
 
 process(stg, function (data, length, i0, i, t) {
   for (; i0 < length; i0++, t = ++i / sr) {
     const beat = div * phase(i, lenBar);
-    if (i % l0 == 0) {
+    if (i % l16 == 0) {
       accent = 1 & (0b00101 >> beat % 5);
       click8 = 1 & (0b01111 >> beat % 5);
 
-      if (i % l1 == 0) {
-        lenNote = l1;
-        if ((0b1001010000 >> beat) & 1) lenNote = l0;
-        else if (rnd(6) < 1) lenNote = l0;
+      if (i % l8 == 0) {
+        lenNote = l8;
+        if ((0b1001010000 >> beat) & 1) lenNote = l16;
+        else if (rnd(6) < 1) lenNote = l16;
       }
 
       if (i % lenNote == 0) updateNote(i, floor(beat));
     }
 
-    const p0 = phase(i, l0);
-    const p1 = phase(i, l1);
+    const p0 = phase(i, l16);
+    const p1 = phase(i, l8);
     const auto0 = am(t / 180);
 
     let envSideClick = 1;
     click: {
-      const e = click8 ? ade(p1, 0.02, 0.2, 0.205) : ade(p0, 0.04, 0.4, 0.41);
+      const e = click8 ? env(p1, 0.02, 0.05, 0.2) : env(p0, 0.04, 0.1, 0.4);
       const a = auto0 * (accent * 0.7 + 0.3) * e;
       envSideClick = 1 - a;
       if (!e) break click;
@@ -94,7 +94,7 @@ process(stg, function (data, length, i0, i, t) {
 
     let synOut = 0;
     syn: {
-      const e0 = lenNote == l0 ? ade(p0, 0.1, 0.1, 0.9) : asd(p1, 0.05, 0.05);
+      const e0 = env(lenNote == l16 ? p0 : p1, 0.1, 0.8, 0.9);
       if (!e0) break syn;
       p += TAU * f * (1 / sr);
       const b0 = 0.5 * a0 * (1 - p1) * sin((2 / 3) * p);
