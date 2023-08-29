@@ -1,8 +1,15 @@
 const title = document.title;
 const q = (s) => document.querySelector(s);
 
-const params = Object.fromEntries(new URLSearchParams(location.search));
-for (const [k, v] of Object.entries(params)) params[k] = parseInt(v);
+const urlParams = Object.fromEntries(new URLSearchParams(location.search));
+for (const [k, v] of Object.entries(urlParams)) urlParams[k] = parseInt(v);
+
+function setQueryStringParameter(name, value) {
+  const params = new URLSearchParams(window.location.search);
+  params.set(name, value);
+  const url = decodeURIComponent(`${window.location.pathname}?${params}`);
+  window.history.replaceState({}, "", url);
+}
 
 function create(tagName, text, className) {
   const el = document.createElement(tagName);

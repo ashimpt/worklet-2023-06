@@ -7,17 +7,25 @@ class PcmToWave {
     Object.assign(this, options);
   }
 
-  static async createUrl(opt, data) {
-    const worker = await new Worker("pcm-to-wave-worker.js");
+  static process(data, opt = {}, ret = "url") {
+    const worker = new Worker("pcm-to-wave-worker.js");
     worker.postMessage(Object.assign({ isOptions: 1 }, opt));
-    for (let ch = 0; ch < data.length; ch++) {
-      worker.postMessage(data[ch], [data[ch].buffer]);
+
+    const chData = new PcmToWave(opt).setupChannel(data);
+    for (let ch = 0; ch < chData.length; ch++) {
+      worker.postMessage(chData[ch], [chData[ch].buffer]);
     }
 
-    return await new Promise((resolve) => {
+    return new Promise((resolve) => {
       worker.onmessage = ({ data }) => {
+        if (ret == "raw") {
+          resolve(data);
+          return;
+        }
+
         const blob = new Blob([data], { type: "audio/wav" });
-        resolve(URL.createObjectURL(blob));
+        if (ret == "blob") resolve(blob);
+        else resolve(URL.createObjectURL(blob));
       };
     });
   }
@@ -33,11 +41,11 @@ class PcmToWave {
   }
 
   convert(buffers) {
-    const buff = this.#setupChannel(buffers);
+    const buff = this.setupChannel(buffers);
     return this.#createWaveFormatData(buff);
   }
 
-  #setupChannel(inputs, numChs = this.numChannels) {
+  setupChannel(inputs, numChs = this.numChannels) {
     const outputs = [];
     if (inputs[0].length) {
       if (inputs.length != numChs) console.warn("numChannels");
@@ -104,7 +112,7 @@ class PcmToWave {
         throw new Error("bitsPerSample");
     }
   }
-  
+
   #setHeader(output, subChunk2Size, { numChannels, sampleRate }) {
     const bitsPerSample = this.bitsPerSample,
       audioFormat = bitsPerSample == 32 ? 3 : 1,

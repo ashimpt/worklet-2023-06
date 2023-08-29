@@ -1,36 +1,69 @@
 const numTracks = 7;
-let ctx, master, analyser, ampWav;
+const df = { tet: 0, fade: 60, solo: 60, sr: 24e3, anlz: 0, seed: 0, bit: 0 };
+let params, ctx, master, analyser, ampWav;
 
 addEventListener("load", () => {
-  if (!params.sr) params.sr = 24e3;
-  if (!params.bit) params.bit = 16;
-  if (params.fade === undefined) params.fade = 60;
-  if (params.solo === undefined) params.solo = 60;
-  if (params.anlz === undefined) params.anlz = 1;
+  q("canvas").width = q("canvas").offsetWidth;
+  q("canvas").height = parseInt(q("canvas").width / 5);
+
+  const aList = [...document.querySelectorAll("#params>a")];
+  for (const a of aList) a.addEventListener("click", updateUrl);
+
+  init();
+});
+
+addEventListener("resize", () => q("#seekbar").replaceWith(createSeekBar()));
+
+function updateUrl(e) {
+  e.preventDefault();
+  // link -> url
+  const a = new URLSearchParams(e.target.href.split("?")[1]);
+  for (const [k, v] of a.entries()) setQueryStringParameter(k, v);
+
+  // url -> urlParams obj
+  const url = new URLSearchParams(location.search);
+  for (const [k, v] of url.entries()) urlParams[k] = parseInt(v);
+
+  init();
+}
+
+async function init() {
+  await changeState("close");
+
+  // params
+  params = Object.assign({}, urlParams);
+  for (const [k, v] of Object.entries(df)) {
+    if (params[k] === undefined) params[k] = v;
+  }
   params.duration = 2 * params.fade + params.solo;
   params.interval = params.fade + params.solo;
   params.totalDuration = (numTracks - 1) * params.interval + params.duration;
   params.length = params.sr * params.totalDuration;
 
-  if (!params.anlz) q("canvas").style.display = "none";
-  const cw = q("canvas").offsetWidth;
-  q("canvas").width = cw;
-  q("canvas").height = parseInt(cw / 5);
+  // elements
+  q("canvas").style.display = params.anlz ? "block" : "none";
 
   const dur = secToTimeString(params.totalDuration);
   q("#info").textContent = `sampleRate: ${params.sr}, ` + `duration: ${dur}`;
 
+  output.replaceChildren();
   q("#output").append(createSeekBar());
-  if (params.rec) q("#output").append(createButton("rec", () => start()));
-  else {
-    q("#output").append(createButton("play", () => start()));
-    q("#output").append(createButton("suspend", () => changeState()));
-  }
+  if (params.bit) q("#output").append(createButton("rec", () => start()));
+  else q("#output").append(createButton("play", () => start()));
 
-  addEventListener("resize", () => {
-    q("#seekbar").replaceWith(createSeekBar());
-  });
-});
+  q("#output").append(createButton("suspend", () => changeState()));
+
+  // link
+  for (const a of [...document.querySelectorAll("#params>a")]) {
+    let selected = 1;
+    const url = new URLSearchParams(a.href.split("?")[1]);
+    for (const [key, value] of url.entries()) {
+      if (params[key] != parseInt(value)) selected = 0;
+    }
+
+    a.classList.toggle("selected", selected);
+  }
+}
 
 function createSeekBar() {
   const w = document.body.offsetWidth;
@@ -61,29 +94,34 @@ function createSeekBar() {
   return c;
 }
 
-const changeState = async (method) => {
-  if (!ctx) return;
+async function changeState(method) {
+  if (!ctx || ctx.state == "closed") return;
+  if (analyser && method == "close") analyser.close();
   if (method) await ctx[method]();
-  else await ctx[ctx.state == "running" ? "suspend" : "resume"]();
+  else {
+    if (ctx instanceof OfflineAudioContext) return;
+    await ctx[ctx.state == "running" ? "suspend" : "resume"]();
+  }
+
   q("#info").textContent = ctx.state;
   if (ctx.state == "closed") ctx = null;
-};
+}
 
 async function start(seekPos = 0) {
   if (/⏳/.test(document.title)) return;
   document.title = "⏳" + title;
 
-  if (analyser) analyser.close();
-  if (ctx && ctx.close) ctx.close();
+  await changeState("close");
 
-  if (params.rec && !seekPos) await render();
+  if (params.bit && !seekPos) await render();
   else await play(seekPos);
 
   document.title = title;
 }
 
 async function play(seekPos) {
-  ctx = new AudioContext({ sampleRate: params.sr });
+  const latencyHint = params.anlz ? "balanced" : "playback";
+  ctx = new AudioContext({ sampleRate: params.sr, latencyHint });
   await changeState("suspend");
 
   const seekTime = parseInt(params.totalDuration * seekPos);
@@ -155,8 +193,7 @@ function handleMasterMessage({ data }) {
 
 async function createWav(data, amplifier) {
   const opt = { amplifier, sampleRate: params.sr, bitsPerSample: params.bit };
-  // const url = new PcmToWave(opt).createBlobUrl(data);
-  const url = await PcmToWave.createUrl(opt, data);
+  const url = await PcmToWave.process(data, opt);
   const txt = new Date().toLocaleTimeString() + ".wav";
   q("#output").append(create("br"), createLink(url, txt));
 }

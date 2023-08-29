@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 4, amp: 0.208 };
+const stg = { id: 4, amp: 0.21 };
 
 const tet = params.tet;
 const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
@@ -79,7 +79,7 @@ process(stg, function (data, length, i0, i, t) {
 
     const p0 = phase(i, l16);
     const p1 = phase(i, l8);
-    const auto0 = am(t / 180);
+    const auto0 = abs(sin(PI * (t / 180)));
 
     let envSideClick = 1;
     click: {

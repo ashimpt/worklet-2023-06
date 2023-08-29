@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 5, amp: 0.351 };
+const stg = { id: 5, amp: 0.3 };
 const g2 = 98;
 let time = 0;
 
@@ -32,9 +32,9 @@ process(stg, function (data, length, i0, i, t) {
       const o = lop0(oct);
       p1 += TAU * g2 * 2 ** o * (1 / sr);
       const b1a = mix(4, 1, o / 3) * sin(2 * p1);
-      const b1 = 1.5 * rndLfo0(i) * am(3 * t) ** 7 * sin(p0 / 2 + b1a); // beat
+      const b1 = 1.7 * rndLfo0(i) * am(3 * t) ** 7 * sin(p0 / 2 + b1a); // beat
       const w0 = TAU * phase(2.5 * t, 1) ** 2;
-      const b2 = 0.3 * rndLfo1(i) * sin(w0 + sin(32 * p0)); // high
+      const b2 = 0.4 * rndLfo1(i) * sin(w0 + sin(32 * p0)); // high
       const b0 = sin(p0 + b1 + b2);
       if (i % sr == 0) fMod = round(rnd(4, 10));
       const a3 = lop1(mix(1, (fMod * t) % 1 < 0.5, rndToggle(i)));

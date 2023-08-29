@@ -10,7 +10,7 @@ const peakMeter = {
   value: 0,
   peak: 0,
   peaks: [0, 0],
-  sumSq: [0.01, 0.01],
+  sumSq: [1e-5, 1e-5],
   process(inp, lenBlock) {
     const { peaks, sumSq } = this;
     let blockPeak = 0;
@@ -32,26 +32,24 @@ const peakMeter = {
       for (let i = lenBlock; i--; ) inp[ch][i] /= v;
   },
   db: (v) => (20 * log10(v)).toFixed(1),
-  post(port, length, t) {
+  getInfo(length, t) {
     const peak = this.peaks.map((v) => v.toFixed(3));
     const rms = this.sumSq.map((v) => this.db(sqrt(v / length)));
     const a = this.value.toFixed(3);
-    const info = { peak, rms, a, t };
-    port.postMessage({ info });
+    return { peak, rms, a, t };
   },
 };
 
 class processor extends AudioWorkletProcessor {
   seekFrame = 0;
-  amp = 1; //TODO: prevent clipping
   constructor(...args) {
     super(...args);
     this.port.onmessage = ({ data }) => {
       Object.assign(params, data);
 
       this.seekFrame = round(sr * params.seekTime);
-      if (this.seekFrame) params.rec = 0;
-      if (params.rec) this.amp = 0.1;
+      if (this.seekFrame) params.bit = 0;
+      params.amp = params.bit ? 0.1 : 1; //-20dB prevent clipping
 
       this.port.postMessage({});
     };
@@ -59,9 +57,10 @@ class processor extends AudioWorkletProcessor {
   process({ 0: inp }, { 0: oup }) {
     const idx = this.seekFrame + currentFrame;
     const lenBlock = oup[0].length;
-    for (let ch = 2, a = this.amp; ch--; ) {
+
+    for (let ch = 2; ch--; ) {
       for (let i = 0; i < lenBlock; i++) {
-        oup[ch][i] = a * hps[ch](inp[ch][i] || 0);
+        oup[ch][i] = hps[ch](inp[ch][i] || 0);
       }
     }
 
@@ -72,41 +71,44 @@ class processor extends AudioWorkletProcessor {
     const end = idx + lenBlock >= params.length;
 
     if (!currentFrame || ct != floor((idx + lenBlock) / sr)) {
-      this.processSec(lenBlock, idx, ct, end);
+      this.processSec(lenBlock, ct, end);
     }
 
     if (!end) return true;
     else {
       const amplifier = 0.89 / peakMeter.peak || void 0;
       this.port.postMessage({ amplifier });
-      if (ampData[0] !== undefined) console.log({ ampData });
-      if (!params.rec) this.port.postMessage({ end: 1 });
+      if (ampList[0] !== undefined) console.log({ ampList });
+      if (!params.bit) this.port.postMessage({ end: 1 });
       return false;
     }
   }
 
-  processSec(lenBlock, idx, ct, end) {
+  processSec(lenBlock, ct, end) {
+    const { bit, warn, amp } = params;
     const t = ct + (currentFrame ? 1 : 0);
 
-    if (params.rec && peakMeter.peak > 1) console.error("clipping");
-    if (params.warn) {
+    if (bit && peakMeter.peak > 1) console.error("clipping");
+    if (warn) {
       const min = floor(t / 60);
-      if (peakMeter.value / this.amp > params.warn / 100) {
-        console.warn({ a: peakMeter.value / this.amp, t });
+      if (peakMeter.value / amp > warn / 100) {
+        console.warn({ a: peakMeter.value / amp, t });
       }
 
-      ampData[min] = max(ampData[min] || 0, peakMeter.value / this.amp);
-      if (t % 60 == 0) logStyle(min - 1 + ":" + (ampData.at(-2) || NaN));
+      ampList[min] = max(ampList[min] || 0, peakMeter.value / amp);
+      if (t % 60 == 0 && ampList.at(-2)) logS(min - 1 + ":" + ampList.at(-2));
     }
 
-    if (!params.rec || end || t % 10 == 0) {
-      peakMeter.post(this.port, idx + lenBlock, t);
+    if (!bit || end || t % 10 == 0) {
+      const info = peakMeter.getInfo(currentFrame + lenBlock, t);
+      if (end) console.log(info);
+      this.port.postMessage({ info });
     }
     peakMeter.value = 0;
   }
 }
 
-const ampData = [];
-const logStyle = (s) => console.log("%c" + s, "font-size:smaller");
+const ampList = [];
+const logS = (s) => console.log("%c" + s, "font-size:smaller");
 
 registerProcessor("master", processor);

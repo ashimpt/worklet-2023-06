@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 6, amp: 0.608 };
+const stg = { id: 6, amp: 0.543 };
 
 const tet = params.tet;
 const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
@@ -24,7 +24,9 @@ for (let i = -1, next; i < 20; i = next) {
 }
 // console.log(avoidNotes);
 
+const fm = freq(9) / freq(0) - 1;
 const decay = (p, h = 0.5, end = 0.6) => clip((end - (p % 1)) / (end - h));
+
 class Synth {
   bottom = [3, -1];
   constructor(id) {
@@ -55,7 +57,7 @@ class Synth {
     const p = TAU * this.f * t;
     const d1 = decay(p0, 5e-3, 0.1);
     const b1 = !d1 ? 0 : 0.7 * d1 * sin(p / E);
-    const b0 = 1.1 * pot(1 - p0, 6) * sin(E * p + b1);
+    const b0 = 1.1 * pot(1 - p0, 6) * sin(fm * p + b1);
     const b = this.a * e0 * sin(p + b0);
     for (let ch = 2; ch--; ) data[ch][i0] += pan(ch ? pp : 1 - pp) * b;
   }
@@ -78,7 +80,7 @@ process(stg, function (data, length, i0, i, t) {
     for (let ch = 2; ch--; ) reverb.input(aux0[ch] + 0.1 * data[ch][i0], i, ch);
     reverb.process(data, i0, i);
 
-    for (let ch = 2; ch--; ) data[ch][i0] += 2 * aux0[ch];
+    for (let ch = 2; ch--; ) data[ch][i0] += 2.15 * aux0[ch];
   }
 });
 
@@ -115,7 +117,7 @@ function createBackground(data, i0, i, t) {
 const reverb = new (class Reverb {
   delays = [...Array(14)].map(() => new Loop(1));
   input(v, i, ch) {
-    this.delays[ch].set(0.5 * v, i);
+    this.delays[ch].set(0.55 * v, i);
   }
   process(data, i0, i) {
     const { inputs, delays } = this;

@@ -7,7 +7,7 @@ onmessage = ({ data }) => {
   if (data.isOptions) pcmToWave = new PcmToWave(data);
   else pcm.push(data);
 
-  if (!pcmToWave || pcm.length != pcmToWave.numChannels) return;
-  const buff = pcmToWave.convert(pcm);
-  postMessage(buff, [buff.buffer]);
+  if (pcm.length != pcmToWave.numChannels) return;
+  const arr = pcmToWave.convert(pcm);
+  postMessage(arr, [arr.buffer]);
 };

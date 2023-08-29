@@ -18,17 +18,6 @@ class XorShift {
   }
 }
 
-class Abstract {
-  constructor(options = {}) {
-    Object.assign(this, options);
-  }
-  static create(options = {}) {
-    const ins = new this();
-    Object.assign(ins, options);
-    return ins.process;
-  }
-}
-
 class M2 {
   TAU = 2 * Math.PI;
   clip = (x, lo = 0, hi = 1) => max(lo, min(hi, x));
@@ -95,6 +84,17 @@ class Loop extends Float64Array {
   feedback(x, idx, deltaIdx = sr, amp = 0.7) {
     const fb = this[mod(parseInt(idx - deltaIdx), this.length)];
     return (this[idx % this.length] = x + amp * fb);
+  }
+}
+
+class Abstract {
+  constructor(options = {}) {
+    Object.assign(this, options);
+  }
+  static create(options = {}) {
+    const ins = new this();
+    Object.assign(ins, options);
+    return ins.process;
   }
 }
 
@@ -206,23 +206,22 @@ class Math2 extends M2 {
   Filter = Filter;
   Hold = Hold;
   Bag = Bag;
+  static create(seed) {
+    const math2 = new Math2();
+    if (!seed) return math2;
+
+    math2.setSeed(seed);
+
+    math2.Hold = class extends Hold {
+      f = math2.random;
+    };
+
+    math2.Bag = class extends Bag {
+      shuffle = math2.shuffle;
+    };
+
+    return math2;
+  }
 }
 
-function createMath2(seed) {
-  const math2 = new Math2();
-  if (!seed) return math2;
-
-  math2.setSeed(seed);
-
-  math2.Hold = class extends Hold {
-    f = math2.random;
-  };
-
-  math2.Bag = class extends Bag {
-    shuffle = math2.shuffle;
-  };
-
-  return math2;
-}
-
-export { M2, Math2, createMath2 };
+export { M2, Math2 };

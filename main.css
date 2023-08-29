@@ -4,10 +4,12 @@
   font-family: monospace;
   margin: 1px 0 0 0;
   padding: 0;
+  white-space: nowrap;
 }
 
-html, body {
-  height: 100%;
+html,
+body {
+  height: 99%;
   width: 100%;
 }
 
@@ -19,11 +21,11 @@ canvas {
   background: #333;
   display: block;
   width: 100vw;
+  height: 20vw;
 }
 
 #info {
   background: #333;
-  white-space: nowrap;
   width: 100vw;
 }
 
@@ -34,4 +36,8 @@ canvas {
 button {
   padding: 1em;
   width: 50vw;
+}
+
+.selected {
+  color: white;
 }

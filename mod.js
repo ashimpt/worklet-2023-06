@@ -1,10 +1,11 @@
 const { min, max, abs } = Math;
 export const sr = sampleRate;
 export const params = {};
-import { createMath2 as _createMath2 } from "./math2.js";
-export const createMath2 = (seed) => _createMath2(seed || params.seed);
 
-export function process({ id, amp }, play) {
+import { Math2 } from "./math2.js";
+export const createMath2 = (seed) => Math2.create(seed || params.seed);
+
+export function process({ id, amp }, playTrack) {
   let duration, fadeRatio, seekFrameFromStart, trackLength;
 
   class processor extends AudioWorkletProcessor {
@@ -27,10 +28,10 @@ export function process({ id, amp }, play) {
       const lenBlock = outputData[0].length;
       if (idxTrack <= -lenBlock) return true;
       const idxBlock = idxTrack < 0 ? -idxTrack : 0;
-      idxTrack = idxTrack < 0 ? 0 : idxTrack;
+      if (idxTrack < 0) idxTrack = 0;
 
       const length = min(lenBlock, trackLength - idxTrack);
-      play(outputData, length, idxBlock, idxTrack, idxTrack / sr);
+      playTrack(outputData, length, idxBlock, idxTrack, idxTrack / sr);
 
       // fade
       for (let i = 0, i0 = idxBlock, i1 = idxTrack; i < length; i++, i0++) {
@@ -42,5 +43,6 @@ export function process({ id, amp }, play) {
     }
   }
 
+  amp *= params.amp;
   registerProcessor(id, processor);
 }
