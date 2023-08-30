@@ -1,6 +1,7 @@
 const numTracks = 7;
 const df = { tet: 0, fade: 60, solo: 60, sr: 24e3, anlz: 0, seed: 0, bit: 0 };
 let params, ctx, master, analyser, ampWav;
+const muteList = [];
 
 addEventListener("load", () => {
   q("canvas").width = q("canvas").offsetWidth;
@@ -16,11 +17,11 @@ addEventListener("resize", () => q("#seekbar").replaceWith(createSeekBar()));
 
 function updateUrl(e) {
   e.preventDefault();
-  // link -> url
+  if (/⏳/.test(document.title)) return;
+
   const a = new URLSearchParams(e.target.href.split("?")[1]);
   for (const [k, v] of a.entries()) setQueryStringParameter(k, v);
 
-  // url -> urlParams obj
   const url = new URLSearchParams(location.search);
   for (const [k, v] of url.entries()) urlParams[k] = parseInt(v);
 
@@ -44,7 +45,10 @@ async function init() {
   q("canvas").style.display = params.anlz ? "block" : "none";
 
   const dur = secToTimeString(params.totalDuration);
-  q("#info").textContent = `sampleRate: ${params.sr}, ` + `duration: ${dur}`;
+  q("#info").textContent = `sampleRate: ${params.sr}, duration: ${dur}`;
+
+  const size = 2 * (params.bit / 8 || 4) * params.sr * params.totalDuration;
+  if (params.bit) q("#info").textContent += ", size: " + dataSizeToString(size);
 
   output.replaceChildren();
   q("#output").append(createSeekBar());
@@ -163,6 +167,7 @@ async function setupMaster(seekTime) {
 }
 
 async function setupTrack(id, seekTime) {
+  if (muteList.indexOf(id) != -1) return;
   await ctx.audioWorklet.addModule(`worklets/${id}.js`);
 
   const worklet = await new AudioWorkletNode(ctx, id, {
@@ -195,7 +200,7 @@ async function createWav(data, amplifier) {
   const opt = { amplifier, sampleRate: params.sr, bitsPerSample: params.bit };
   const url = await PcmToWave.process(data, opt);
   const txt = new Date().toLocaleTimeString() + ".wav";
-  q("#output").append(create("br"), createLink(url, txt));
+  q("#output").append(createLink(url, txt));
 }
 
 function createAnalyser() {

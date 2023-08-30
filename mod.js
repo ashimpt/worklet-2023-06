@@ -37,7 +37,7 @@ export function process({ id, amp }, playTrack) {
       for (let i = 0, i0 = idxBlock, i1 = idxTrack; i < length; i++, i0++) {
         const p = i1++ / sr / duration;
         const a = amp * min(p / fadeRatio, 1, (1 - p) / fadeRatio) ** 0.7;
-        for (let ch = 2; ch--; ) outputData[ch][i0] *= a;
+        for (let ch = 2; ch--; ) outputData[ch][i0] *= a || 0;
       }
       return true;
     }

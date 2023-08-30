@@ -70,6 +70,13 @@ pSvg.rect = (x, y, width, height) => {
 function secToTimeString(t) {
   const date = new Date(t * 1e3);
   let s = date.toISOString().substring(11, 19);
-  if (t >= 24 * 60 * 60) s = parseInt(t / 24 / 60 / 60) + "d " + s;
+  if (t >= 60 * 60 * 24) s = parseInt(t / 60 / 60 / 24) + "d " + s;
   return s.replace(/^00:/, "");
+}
+
+function dataSizeToString(size) {
+  const o = Math.log2(size);
+  const u = ",K,M,G,T,P,E,Z,Y".split(",").at(o / 10) + "B";
+  const n = size / 1024 ** parseInt(o / 10);
+  return o / 10 < 1 ? n + "bytes" : n.toFixed(1) + u;
 }

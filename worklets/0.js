@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 0, amp: 2.383 };
+const stg = { id: 0, amp: 2.351 };
 
 const tet = params.tet;
 const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
@@ -35,7 +35,7 @@ process(stg, function (data, length, i0, i, t) {
     const b0 = asd(u, 0.33, 0.33) * mix(sin((f + df) * q), sin((f - df) * q));
     const b3a = o < 3 ? 0.7 * sin(800 * q) : 0;
     const b3 = 0.3 * decay(u, 0.05) * (sin(4 * p) + b3a);
-    const b2 = (2.5 / o) * decay(u, 1) * sin(fm * p + b3);
+    const b2 = (2.1 / o) * decay(u, 1) * sin(fm * p + b3);
     const b1 = asd(u) * sin(p + b2 - 0.5 * am(t / fLfo + pLfo) * b0);
     const b = min(1, 2 / o) * (0.2 * b1 + 0.07 * b0);
     const pp = 0.5 + (-1) ** arp * mix(0, 0.25, arp / 14);

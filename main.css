@@ -33,6 +33,11 @@ canvas {
   white-space: nowrap;
 }
 
+#output>a {
+  display:block;
+  margin: 1em;
+}
+
 button {
   padding: 1em;
   width: 50vw;

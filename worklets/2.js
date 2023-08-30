@@ -5,7 +5,7 @@ const math2 = createMath2();
 const { TAU, mod, mix, clip, phase, crush, pot, pan, am, asd, rnd } = math2;
 const { Loop, Bag, Lop, Filter, SH, Hold } = math2;
 ////////////////////////////////////////////////////////////////////////////////
-const stg = { id: 2, amp: 0.567 };
+const stg = { id: 2, amp: 0.615 };
 
 const tet = params.tet;
 const baseNotes = [1, 10 / 8, 4 / 3, 12 / 8, 15 / 8].map((v) => log2(v));
@@ -32,7 +32,7 @@ function createNote(t, beat) {
   if (repFrq.length >= 2 && !mainBeat) return;
   if (repFrq.filter((o) => !o.long && o.i < sr).length >= 2) return;
 
-  const o = log2(f / 50); // 0.9 - 3.4
+  const o = log2(f / 50); // 0.97 - 3.97
 
   const longNum = list.filter((o) => o.long).length < 3;
   const longFrq = list.find((o) => o.long && o.f == f) === undefined;
@@ -40,7 +40,7 @@ function createNote(t, beat) {
 
   const pp = long ? 0.5 : mix(0.5, (count++ % 5) / 4, 0.9);
   const l = (long ? 6 : 2) * sr;
-  const fm = long ? freq(n + 6) / f - 1 : 3;
+  const fm = long ? freq(n + 6) / f - 1 : null;
   list.push({ i: 0, n, f, o, pp, long, l, fm });
 }
 
@@ -55,14 +55,14 @@ function synth(data, i0, t, s) {
   const p = TAU * f * t0;
   let b;
   if (long) {
-    const a1 = (7 / o) * asd(t + 4 * asd(t / 4.5, 0.5), 0.3, 0.3);
+    const a1 = (8 / o) * asd(t + 4 * asd(t / 4.5, 0.5), 0.3, 0.3);
     const b1 = a1 * sin(fm * p);
-    b = 0.25 * asd(p0, 0.1, 1e-3) * sin(p + b1);
+    b = 0.3 * asd(p0, 0.1, 1e-3) * sin(p + b1);
   } else {
     const b0a = 2 * decay(t0, 0.03) * sin(3 * p);
     const b0 = min(4, 5 / o) * decay(t0, 0.2) * sin(2 * p + b0a);
     const b1 = (150 / f) * decay(t0, 0.7 / o) * sin(5 * p);
-    const a2 = f < 201 ? 0 : (4 / o) * (t0 / t0 ** t0);
+    const a2 = f < 201 ? 0 : (5 / o) * (t0 / t0 ** t0);
     const b2 = f < 201 ? 0 : a2 * mix(sin(3 * p), sin(3.015 * p));
     b = 0.63 * asd(p0, 0.01) * sin(p + b0 + b1 + b2);
     aux0 += b;

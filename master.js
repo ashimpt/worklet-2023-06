@@ -57,15 +57,18 @@ class processor extends AudioWorkletProcessor {
   process({ 0: inp }, { 0: oup }) {
     const idx = this.seekFrame + currentFrame;
     const lenBlock = oup[0].length;
+    const inputsAvailable = inp.length;
 
-    for (let ch = 2; ch--; ) {
-      for (let i = 0; i < lenBlock; i++) {
-        oup[ch][i] = hps[ch](inp[ch][i] || 0);
+    if (inputsAvailable) {
+      for (let ch = 2; ch--; ) {
+        for (let i = 0; i < lenBlock; i++) {
+          oup[ch][i] = hps[ch](inp[ch][i] || 0);
+        }
       }
-    }
 
-    peakMeter.process(oup, lenBlock);
-    peakMeter.limit(oup, lenBlock);
+      peakMeter.process(oup, lenBlock);
+      peakMeter.limit(oup, lenBlock);
+    }
 
     const ct = floor(idx / sr);
     const end = idx + lenBlock >= params.length;
