@@ -19,7 +19,6 @@ body {
 
 canvas {
   background: #333;
-  display: block;
   width: 100vw;
   height: 20vw;
 }
@@ -27,10 +26,6 @@ canvas {
 #info {
   background: #333;
   width: 100vw;
-}
-
-#output {
-  white-space: nowrap;
 }
 
 #output>a {

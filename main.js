@@ -7,23 +7,35 @@ addEventListener("load", () => {
   q("canvas").width = q("canvas").offsetWidth;
   q("canvas").height = parseInt(q("canvas").width / 5);
 
+  q("#clear").addEventListener("click", (e) => updateUrl(e, 1));
+  q("#new-window").addEventListener("click", (e) => {
+    e.preventDefault();
+    // prevent addModule freeze
+    window.open(location.href, "_blank");
+    window.close();
+  });
   const aList = [...document.querySelectorAll("#params>a")];
-  for (const a of aList) a.addEventListener("click", updateUrl);
+  for (const a of aList) a.addEventListener("click", (e) => updateUrl(e));
 
   init();
 });
 
 addEventListener("resize", () => q("#seekbar").replaceWith(createSeekBar()));
 
-function updateUrl(e) {
+function updateUrl(e, clear = false) {
   e.preventDefault();
   if (/⏳/.test(document.title)) return;
 
-  const a = new URLSearchParams(e.target.href.split("?")[1]);
-  for (const [k, v] of a.entries()) setQueryStringParameter(k, v);
-
-  const url = new URLSearchParams(location.search);
-  for (const [k, v] of url.entries()) urlParams[k] = parseInt(v);
+  if (clear) {
+    const url = decodeURIComponent(`${window.location.pathname}?`);
+    window.history.replaceState({}, "", url);
+    for (const [k, v] of Object.entries(urlParams)) urlParams[k] = undefined;
+  } else {
+    const a = new URLSearchParams(e.target.href.split("?")[1]);
+    for (const [k, v] of a.entries()) setQueryStringParameter(k, v);
+    const url = new URLSearchParams(location.search);
+    for (const [k, v] of url.entries()) urlParams[k] = parseInt(v);
+  }
 
   init();
 }
@@ -46,18 +58,15 @@ async function init() {
 
   const dur = secToTimeString(params.totalDuration);
   q("#info").textContent = `sampleRate: ${params.sr}, duration: ${dur}`;
-
   const size = 2 * (params.bit / 8 || 4) * params.sr * params.totalDuration;
   if (params.bit) q("#info").textContent += ", size: " + dataSizeToString(size);
 
   output.replaceChildren();
   q("#output").append(createSeekBar());
-  if (params.bit) q("#output").append(createButton("rec", () => start()));
-  else q("#output").append(createButton("play", () => start()));
-
+  q("#output").append(createButton(params.bit ? "rec" : "play", () => start()));
   q("#output").append(createButton("suspend", () => changeState()));
 
-  // link
+  // links
   for (const a of [...document.querySelectorAll("#params>a")]) {
     let selected = 1;
     const url = new URLSearchParams(a.href.split("?")[1]);
@@ -76,7 +85,6 @@ function createSeekBar() {
 
   const { canvas, rect, line } = pSvg;
   const c = canvas(w, h);
-  c.addEventListener("click", (ev) => start(ev.x / w));
   c.style.background = "#333";
   c.style.display = "block";
   c.id = "seekbar";
@@ -95,6 +103,7 @@ function createSeekBar() {
     c.append(li0, li1, li2);
   }
 
+  c.addEventListener("click", (ev) => start(ev.x / w));
   return c;
 }
 
@@ -103,8 +112,8 @@ async function changeState(method) {
   if (analyser && method == "close") analyser.close();
   if (method) await ctx[method]();
   else {
-    if (ctx instanceof OfflineAudioContext) return;
-    await ctx[ctx.state == "running" ? "suspend" : "resume"]();
+    if (ctx instanceof OfflineAudioContext) console.warn(ctx.state, ctx);
+    else await ctx[ctx.state == "running" ? "suspend" : "resume"]();
   }
 
   q("#info").textContent = ctx.state;
@@ -124,7 +133,9 @@ async function start(seekPos = 0) {
 }
 
 async function play(seekPos) {
-  const latencyHint = params.anlz ? "balanced" : "playback";
+  const hints = "playback,playback,balanced,interactive".split(",");
+  const latencyHint = hints[params.anlz];
+
   ctx = new AudioContext({ sampleRate: params.sr, latencyHint });
   await changeState("suspend");
 
@@ -139,24 +150,36 @@ async function play(seekPos) {
 async function render() {
   ctx = new OfflineAudioContext({
     numberOfChannels: 2,
-    sampleRate: params.sr,
     length: params.length,
+    sampleRate: params.sr,
   });
 
   await setupMaster(0);
   for (let i = numTracks; i--; ) await setupTrack(i, 0);
 
-  const audioBuffer = await ctx.startRendering();
-  const data = [0, 1].map((ch) => audioBuffer.getChannelData(ch));
+  let audioBuffer;
+  try {
+    audioBuffer = await ctx.startRendering();
+  } catch (e) {
+    alert(e); // try length
+    ctx = null;
+    return;
+  }
+  const data = [0, 1].map(() => new Float32Array(params.length));
+  for (let ch = 2; ch--; ) audioBuffer.copyFromChannel(data[ch], ch);
 
   while (!ampWav) await new Promise((rsl) => setTimeout(rsl, 100));
   createWav(data, ampWav);
-  ampWav = 0;
+  ampWav = null;
 }
 
 async function setupMaster(seekTime) {
-  await ctx.audioWorklet.addModule("master.js");
+  // TODO: OfflineAudioContext addModule freeze ?
+  // rec -> redirect to this page with different query -> rec
+
+  await ctx.audioWorklet.addModule("./master.js");
   master = await new AudioWorkletNode(ctx, "master", {});
+
   await new Promise((rsl) => {
     master.port.postMessage(Object.assign({ seekTime }, params));
     master.port.onmessage = rsl;

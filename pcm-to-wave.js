@@ -18,6 +18,8 @@ class PcmToWave {
 
     return new Promise((resolve) => {
       worker.onmessage = ({ data }) => {
+        worker.terminate();
+        
         if (ret == "raw") {
           resolve(data);
           return;
